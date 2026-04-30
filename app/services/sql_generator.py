@@ -47,6 +47,11 @@ Domain knowledge:
 - When the user asks about "actual budget", "actuals", "actual spend", "actual cost", or "actual amount", use fact_afe_actuals.amount.
 - When the user asks about "budget", "budgeted amount", or "planned spend", use fact_afe_budgets.amount.
 - dim_chart_of_account has NO "name" column — use "account_code" for the code and "description" for the label.
+- For division order owner information (owner number, owner name, decimal interest, interest type), use dim_do_lines_of_interest joined to dim_business_associate and dim_division_order. Owner Number = dim_business_associate.number, Owner Name = dim_business_associate.name, Decimal Interest = dim_do_lines_of_interest.nri, Interest Type = dim_do_lines_of_interest.interest_type_name. Never use decimal_interest as a column name — the correct column is nri.
+- For AP outstanding amounts, overdue invoices, or aging payables, use dim_invoice — NOT dim_ap_payment. dim_ap_payment records completed payments. Use dim_invoice.current_total for the unpaid balance, dim_invoice.effective_invoice_due_date for aging (e.g. overdue > 120 days: effective_invoice_due_date < DATEADD(day, -120, GETDATE())), dim_invoice.company_name for vendor name. Always filter is_void = 0 and current_total > 0 for open invoices.
+- dim_invoice has NO chart_of_account_id column. For outstanding amounts broken down by chart of account, join fact_gl_transactions (which has invoice_id and chart_of_account_id) to dim_invoice and dim_chart_of_account. Use fact_gl_transactions.invoice_id → dim_invoice.id and fact_gl_transactions.chart_of_account_id → dim_chart_of_account.id.
+- For Gross MCF, Total Revenue, Fees, Margin, or Total Costs per meter, use fact_rpt_contract_values. Column mapping: Gross MCF = meas_mcf, Total Revenue = tot_product_value, Fees = tot_fee_value, Margin = margin_value, Total Costs = tot_fee_value + total_tax_value. Meter info (meter_number, meter_name) is already on this table — no join to dim_meter needed. Filter by accounting_date for a specific period.
+- For volumes by volume type (Gross Wellhead, Field Fuel, Plant Inlet, or any named usage/volume category) per meter, use fact_allocated_results_monthly joined to dim_usage (for volume type name) and dim_meter (for meter name/number). Volume = allocated_quantity, Volume Type = dim_usage.name. Join: fact_allocated_results_monthly.usage_id → dim_usage.id, fact_allocated_results_monthly.meter_id → dim_meter.id. Filter by meter (dim_meter.number or dim_meter.name) and accounting_date.
 
 Join relationships (all dimension tables use "id" as their primary key):
 - fact_afe_budgets.afe_id            → dim_afe.id
@@ -58,6 +63,13 @@ Join relationships (all dimension tables use "id" as their primary key):
 - fact_afe_actuals.cost_center_id    → dim_cost_center.id
 - fact_afe_actuals.company_id        → dim_company.id
 - dim_afe_supplement.afe_id          → dim_afe.id
+- dim_do_lines_of_interest.division_order_id → dim_division_order.id
+- dim_do_lines_of_interest.owner_ba_id       → dim_business_associate.id
+- fact_gl_transactions.invoice_id            → dim_invoice.id
+- fact_gl_transactions.chart_of_account_id   → dim_chart_of_account.id
+- fact_gl_transactions.business_associate_id → dim_business_associate.id
+- fact_allocated_results_monthly.meter_id    → dim_meter.id
+- fact_allocated_results_monthly.usage_id    → dim_usage.id
 
 Rules:
 1. Only generate SELECT queries — never INSERT, UPDATE, DELETE, DROP, or any DDL.
@@ -139,10 +151,14 @@ Rules:
 
     def _extract_sql(self, response: str) -> str:
         if "```sql" in response:
-            return response.split("```sql")[1].split("```")[0].strip()
-        if "```" in response:
-            return response.split("```")[1].split("```")[0].strip()
-        return response.strip()
+            sql = response.split("```sql")[1].split("```")[0].strip()
+        elif "```" in response:
+            sql = response.split("```")[1].split("```")[0].strip()
+        else:
+            sql = response.strip()
+        # Strip single-line comments added by weaker fallback models
+        sql = re.sub(r'--[^\n]*', '', sql)
+        return sql.strip()
 
     def _validate(self, sql: str, schema: dict) -> Tuple[bool, str]:
         if not sql:
