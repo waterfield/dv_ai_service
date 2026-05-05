@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="ChatSQL API",
+    title="W AI Reporting",
     description="Natural language to SQL for SQL Server",
     version="0.1.0",
     lifespan=lifespan,
@@ -43,4 +43,4 @@ app.include_router(router, prefix="/api", tags=["api"])
 
 @app.get("/")
 async def root():
-    return {"message": "ChatSQL API", "docs": "/docs"}
+    return {"message": "W AI Reporting", "docs": "/docs"}
