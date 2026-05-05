@@ -48,13 +48,12 @@ def api_execute(sql: str) -> dict:
 
 
 # --- header ---
-st.title("W AI Reporting")
-
 connected = api_health()
-if connected:
-    st.success("Connected to database", icon="✅")
-else:
-    st.error("Cannot reach backend or database", icon="❌")
+dot_color = "green" if connected else "red"
+st.markdown(
+    f'# W AI Reporting &nbsp;<span style="color:{dot_color}; font-size:28px;">●</span>',
+    unsafe_allow_html=True,
+)
 
 st.divider()
 
