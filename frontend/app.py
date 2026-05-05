@@ -99,55 +99,48 @@ for i, msg in enumerate(st.session_state.messages):
                     st.plotly_chart(fig, use_container_width=True)
                 else:
                     st.info("Cannot render this chart type with the current data")
-        else:
-            if st.button("Run Query", key=f"run_{i}"):
-                with st.spinner("Executing..."):
-                    try:
-                        resp = api_execute(msg["sql"])
-                        if resp.get("status") == "success":
-                            st.session_state.messages[i]["results"] = resp["rows"]
-                            st.session_state.messages[i]["columns"] = resp["columns"]
-                            st.session_state.messages[i]["row_count"] = resp["row_count"]
-                            st.session_state.messages[i]["retries"] = resp.get("retries", 0)
-                            st.session_state.messages[i]["iterations"] = resp.get("iterations", [])
-                        else:
-                            st.session_state.messages[i]["exec_error"] = resp.get("error", "Unknown error")
-                            st.session_state.messages[i]["iterations"] = resp.get("iterations", [])
-                    except Exception as e:
-                        st.session_state.messages[i]["exec_error"] = str(e)
-                st.rerun()
 
 # --- chat input ---
 if prompt := st.chat_input("Ask a question about your data..."):
+    chat_resp = None
     with st.spinner("Generating SQL..."):
         try:
-            resp = api_chat(prompt)
-            if resp.get("status") == "sql_generated":
-                st.session_state.messages.append({
-                    "query": prompt,
-                    "sql": resp["sql_query"],
-                    "dax_query": resp.get("dax_query"),
-                    "results": None,
-                    "columns": [],
-                    "row_count": 0,
-                })
-            else:
-                st.session_state.messages.append({
-                    "query": prompt,
-                    "sql": resp.get("sql_query", ""),
-                    "dax_query": resp.get("dax_query"),
-                    "chat_error": resp.get("error", "SQL validation failed"),
-                    "results": None,
-                    "columns": [],
-                    "row_count": 0,
-                })
+            chat_resp = api_chat(prompt)
         except Exception as e:
             st.session_state.messages.append({
-                "query": prompt,
-                "sql": "",
-                "chat_error": str(e),
-                "results": None,
-                "columns": [],
-                "row_count": 0,
+                "query": prompt, "sql": "", "chat_error": str(e),
+                "results": None, "columns": [], "row_count": 0,
             })
+            st.rerun()
+
+    if chat_resp.get("status") == "sql_generated":
+        msg = {
+            "query": prompt,
+            "sql": chat_resp["sql_query"],
+            "dax_query": chat_resp.get("dax_query"),
+            "results": None, "columns": [], "row_count": 0,
+        }
+        with st.spinner("Executing query..."):
+            try:
+                exec_resp = api_execute(chat_resp["sql_query"])
+                if exec_resp.get("status") == "success":
+                    msg["results"] = exec_resp["rows"]
+                    msg["columns"] = exec_resp["columns"]
+                    msg["row_count"] = exec_resp["row_count"]
+                    msg["retries"] = exec_resp.get("retries", 0)
+                    msg["iterations"] = exec_resp.get("iterations", [])
+                else:
+                    msg["exec_error"] = exec_resp.get("error", "Unknown error")
+                    msg["iterations"] = exec_resp.get("iterations", [])
+            except Exception as e:
+                msg["exec_error"] = str(e)
+        st.session_state.messages.append(msg)
+    else:
+        st.session_state.messages.append({
+            "query": prompt,
+            "sql": chat_resp.get("sql_query", ""),
+            "dax_query": chat_resp.get("dax_query"),
+            "chat_error": chat_resp.get("error", "SQL validation failed"),
+            "results": None, "columns": [], "row_count": 0,
+        })
     st.rerun()
