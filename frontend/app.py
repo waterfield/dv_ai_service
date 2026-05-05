@@ -67,21 +67,11 @@ for i, msg in enumerate(st.session_state.messages):
             st.error(msg["chat_error"])
             continue
 
-        with st.expander("Generated Query", expanded=not msg.get("results")):
-            tab_sql, tab_dax = st.tabs(["SQL", "DAX"])
-            with tab_sql:
-                st.code(msg["sql"], language="sql")
-            with tab_dax:
-                if msg.get("dax_query"):
-                    st.code(msg["dax_query"], language="python")
-                else:
-                    st.info("DAX query not available")
-
         if msg.get("exec_error"):
             st.error(msg["exec_error"])
         elif msg.get("results") is not None:
             df = pd.DataFrame(msg["results"], columns=msg["columns"])
-            tab_table, tab_chart = st.tabs(["Table", "Chart"])
+            tab_table, tab_chart, tab_query = st.tabs(["Table", "Chart", "Query"])
             with tab_table:
                 st.dataframe(df, use_container_width=True)
                 st.caption(f"{msg['row_count']} row(s) returned")
@@ -99,6 +89,15 @@ for i, msg in enumerate(st.session_state.messages):
                     st.plotly_chart(fig, use_container_width=True)
                 else:
                     st.info("Cannot render this chart type with the current data")
+            with tab_query:
+                tab_sql, tab_dax = st.tabs(["SQL", "DAX"])
+                with tab_sql:
+                    st.code(msg["sql"], language="sql")
+                with tab_dax:
+                    if msg.get("dax_query"):
+                        st.code(msg["dax_query"], language="python")
+                    else:
+                        st.info("DAX query not available")
 
 # --- chat input ---
 if prompt := st.chat_input("Ask a question about your data..."):
