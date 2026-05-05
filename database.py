@@ -1,6 +1,6 @@
 import logging
 import threading
-from sqlalchemy import create_engine, text, inspect
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool
 
@@ -68,20 +68,33 @@ def get_schema() -> dict:
     with _schema_lock:
         if _schema_cache is not None:
             return _schema_cache
-        inspector = inspect(engine)
+
+        placeholders = ", ".join(f":s{i}" for i in range(len(DATABASE_SCHEMAS)))
+        params = {f"s{i}": s for i, s in enumerate(DATABASE_SCHEMAS)}
+        sql = text(f"""
+            SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, DATA_TYPE, IS_NULLABLE
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA IN ({placeholders})
+            ORDER BY TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION
+        """)
+
         schema = {}
-        for schema_name in DATABASE_SCHEMAS:
-            for table in inspector.get_table_names(schema=schema_name):
+        with engine.connect() as conn:
+            for row in conn.execute(sql, params):
+                schema_name, table_name, col_name, data_type, is_nullable = row
                 # dbo tables are accessible without qualification in SQL Server;
                 # non-dbo tables need schema.table syntax in generated SQL.
-                key = table if schema_name.lower() == "dbo" else f"{schema_name}.{table}"
+                key = table_name if schema_name.lower() == "dbo" else f"{schema_name}.{table_name}"
                 if not _include_table(key):
                     continue
-                cols = inspector.get_columns(table, schema=schema_name)
-                schema[key] = [
-                    {"name": c["name"], "type": str(c["type"]), "nullable": c["nullable"]}
-                    for c in cols
-                ]
+                if key not in schema:
+                    schema[key] = []
+                schema[key].append({
+                    "name": col_name,
+                    "type": data_type,
+                    "nullable": is_nullable == "YES",
+                })
+
         _schema_cache = schema
         if TABLE_KEY_FILTER or TABLE_WHITELIST or TABLE_EXCEPTION_LIST:
             logger.info(
