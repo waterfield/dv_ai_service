@@ -9,7 +9,7 @@ load_dotenv()
 
 API_URL = os.getenv("BACKEND_API_URL", "http://localhost:8000")
 
-st.set_page_config(page_title="ChatSQL", layout="centered")
+st.set_page_config(page_title="W AI Reporting", layout="centered")
 
 # --- session state ---
 if "messages" not in st.session_state:
@@ -48,7 +48,7 @@ def api_execute(sql: str) -> dict:
 
 
 # --- header ---
-st.title("ChatSQL")
+st.title("W AI Reporting")
 
 connected = api_health()
 if connected:
