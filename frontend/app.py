@@ -11,6 +11,11 @@ API_URL = os.getenv("BACKEND_API_URL", "http://localhost:8000")
 
 st.set_page_config(page_title="W AI Reporting", layout="centered")
 
+st.markdown(
+    "<style>.block-container { padding-top: 1rem; } h1 { font-size: 1.8rem !important; }</style>",
+    unsafe_allow_html=True,
+)
+
 # --- session state ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -51,7 +56,7 @@ def api_execute(sql: str) -> dict:
 connected = api_health()
 dot_color = "green" if connected else "red"
 st.markdown(
-    f'# W AI Reporting &nbsp;<span style="color:{dot_color}; font-size:28px;">●</span>',
+    f'# W AI Reporting &nbsp;<span style="color:{dot_color}; font-size:20px;">●</span>',
     unsafe_allow_html=True,
 )
 
