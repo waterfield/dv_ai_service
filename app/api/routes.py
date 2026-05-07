@@ -4,6 +4,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from config import ENABLE_DAX
 from database import get_db, get_schema, test_connection, invalidate_schema_cache
 from app.schemas import ChatRequest, ChatResponse, ExecuteRequest, ExecuteResponse, IterationDetail
 from app.services.llm_service import LLMService
@@ -44,10 +45,11 @@ async def chat(request: ChatRequest):
         sql, valid = sql_gen.generate(request.user_query, schema)
 
         dax = None
-        try:
-            dax = dax_gen.generate(request.user_query, schema)
-        except Exception as dax_err:
-            logger.warning(f"DAX generation failed (non-critical): {dax_err}")
+        if ENABLE_DAX:
+            try:
+                dax = dax_gen.generate(request.user_query, schema)
+            except Exception as dax_err:
+                logger.warning(f"DAX generation failed (non-critical): {dax_err}")
 
         return ChatResponse(
             query_id=qid,
