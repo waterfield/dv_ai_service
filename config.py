@@ -16,6 +16,16 @@ DATABASE_URL = (
     "?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes&Connection+Timeout=10"
 )
 
+# LLM configuration
+# Format: comma-separated list of service:model[@provider_hint]
+# service = groq | openrouter
+# provider_hint (openrouter only) = preferred underlying provider, e.g. @Together
+# Example: groq:llama-3.3-70b-versatile,openrouter:anthropic/claude-3-5-sonnet,openrouter:meta-llama/llama-3.3-70b@Together
+LLM_MODELS: str = os.getenv("LLM_MODELS", "").strip()
+GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
+ENABLE_DAX: bool = os.getenv("ENABLE_DAX", "false").lower() == "true"
+
 # SQL Server schema(s) to introspect — comma-separated, defaults to dbo
 # Single schema: plain table names used as keys (e.g. my_table)
 # Multiple schemas: fully qualified keys used (e.g. dbo.my_table, staging.my_table)

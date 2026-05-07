@@ -4,5 +4,6 @@ sqlalchemy==2.0.35
 pyodbc==5.1.0
 pandas==2.2.0
 groq==0.11.0
+openai==1.82.0
 pydantic-settings==2.4.0
 python-dotenv==1.0.1
