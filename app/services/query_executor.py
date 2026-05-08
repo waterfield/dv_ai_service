@@ -50,7 +50,7 @@ class QueryExecutorService:
         if not sql or not sql.strip():
             return "Query cannot be empty"
         upper = sql.strip().upper()
-        if not upper.startswith("SELECT"):
+        if not (upper.startswith("SELECT") or upper.startswith("WITH")):
             return "Only SELECT queries are allowed"
         for kw in FORBIDDEN:
             if re.search(rf"\b{kw}\b", upper):
