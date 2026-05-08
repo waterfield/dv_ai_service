@@ -26,11 +26,11 @@ GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
 OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
 ENABLE_DAX: bool = os.getenv("ENABLE_DAX", "false").lower() == "true"
 
-# SQL Server schema(s) to introspect — comma-separated, defaults to dbo
-# Single schema: plain table names used as keys (e.g. my_table)
-# Multiple schemas: fully qualified keys used (e.g. dbo.my_table, staging.my_table)
-_raw_schemas = os.getenv("DATABASE_SCHEMA", "dbo")
-DATABASE_SCHEMAS: list[str] = [s.strip() for s in _raw_schemas.split(",") if s.strip()]
+# Single SQL Server schema to introspect — multiple schemas are not supported
+_raw_schema = os.getenv("DATABASE_SCHEMA", "dbo").strip()
+if "," in _raw_schema:
+    raise ValueError("DATABASE_SCHEMA must be a single schema name, not a comma-separated list")
+DATABASE_SCHEMA: str = _raw_schema
 
 # Schema filtering — all are optional and combinable
 # TABLE_KEY_FILTER:     only include tables whose name contains this substring (case-insensitive)

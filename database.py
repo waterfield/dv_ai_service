@@ -4,7 +4,7 @@ from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool
 
-from config import DATABASE_URL, DEBUG, TABLE_KEY_FILTER, TABLE_WHITELIST, TABLE_EXCEPTION_LIST, DATABASE_SCHEMAS
+from config import DATABASE_URL, DEBUG, TABLE_KEY_FILTER, TABLE_WHITELIST, TABLE_EXCEPTION_LIST, DATABASE_SCHEMA
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -31,6 +31,8 @@ def get_db():
 
 _schema_cache = None
 _schema_lock = threading.Lock()
+_relationships_cache = None
+_relationships_lock = threading.Lock()
 
 
 def test_connection() -> bool:
@@ -45,11 +47,6 @@ def test_connection() -> bool:
 
 
 def _include_table(name: str) -> bool:
-    """Return True if the table should be included based on filter config.
-
-    Exception list is checked first (blacklist, highest priority).
-    Then inclusion: no filters → include all; otherwise include if matches key filter OR whitelist.
-    """
     if TABLE_EXCEPTION_LIST and name in TABLE_EXCEPTION_LIST:
         return False
     if not TABLE_KEY_FILTER and not TABLE_WHITELIST:
@@ -71,34 +68,58 @@ def get_schema() -> dict:
 
         inspector = inspect(engine)
         schema = {}
-        for schema_name in DATABASE_SCHEMAS:
-            for table in inspector.get_table_names(schema=schema_name):
-                # dbo tables are accessible without qualification in SQL Server;
-                # non-dbo tables need schema.table syntax in generated SQL.
-                key = table if schema_name.lower() == "dbo" else f"{schema_name}.{table}"
-                if not _include_table(key):
-                    continue
-                cols = inspector.get_columns(table, schema=schema_name)
-                schema[key] = [
-                    {"name": c["name"], "type": str(c["type"]), "nullable": c["nullable"]}
-                    for c in cols
-                ]
+        for table in inspector.get_table_names(schema=DATABASE_SCHEMA):
+            if not _include_table(table):
+                continue
+            cols = inspector.get_columns(table, schema=DATABASE_SCHEMA)
+            schema[table] = [
+                {"name": c["name"], "type": str(c["type"]), "nullable": c["nullable"]}
+                for c in cols
+            ]
 
         _schema_cache = schema
         if TABLE_KEY_FILTER or TABLE_WHITELIST or TABLE_EXCEPTION_LIST:
             logger.info(
-                f"Schema loaded: {len(schema)} tables from {DATABASE_SCHEMAS} "
+                f"Schema loaded: {len(schema)} tables from {DATABASE_SCHEMA!r} "
                 f"(key_filter={TABLE_KEY_FILTER!r}, whitelist={TABLE_WHITELIST or 'none'}, "
                 f"exceptions={TABLE_EXCEPTION_LIST or 'none'})"
             )
         else:
-            logger.info(f"Schema loaded: {len(schema)} tables from {DATABASE_SCHEMAS} (no filter)")
+            logger.info(f"Schema loaded: {len(schema)} tables from {DATABASE_SCHEMA!r} (no filter)")
         return schema
 
 
+def get_relationships(schema: dict) -> dict[str, str]:
+    global _relationships_cache
+    if _relationships_cache is not None:
+        return _relationships_cache
+    with _relationships_lock:
+        if _relationships_cache is not None:
+            return _relationships_cache
+
+        schema_tables = set(schema.keys())
+        relationships: dict[str, str] = {}
+        inspector = inspect(engine)
+
+        for table in inspector.get_table_names(schema=DATABASE_SCHEMA):
+            if table not in schema_tables:
+                continue
+            for fk in inspector.get_foreign_keys(table, schema=DATABASE_SCHEMA):
+                ref_table = fk["referred_table"]
+                if ref_table not in schema_tables:
+                    continue
+                for col, ref_col in zip(fk["constrained_columns"], fk["referred_columns"]):
+                    relationships[f"{table}.{col}"] = f"{ref_table}.{ref_col}"
+
+        _relationships_cache = relationships
+        logger.info(f"Relationships loaded: {len(relationships)} FK mappings")
+        return relationships
+
+
 def invalidate_schema_cache() -> None:
-    """Force schema to reload on next call (e.g. after changing filter config)."""
-    global _schema_cache
+    global _schema_cache, _relationships_cache
     with _schema_lock:
         _schema_cache = None
-    logger.info("Schema cache cleared")
+    with _relationships_lock:
+        _relationships_cache = None
+    logger.info("Schema and relationships cache cleared")
