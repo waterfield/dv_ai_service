@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from config import ENABLE_DAX
-from database import get_db, get_schema, get_relationships, test_connection, invalidate_schema_cache
+from database import get_db, get_schema, get_relationships, get_descriptions, test_connection, invalidate_schema_cache
 from app.schemas import ChatRequest, ChatResponse, ExecuteRequest, ExecuteResponse, IterationDetail
 from app.services.llm_service import LLMService
 from app.services.sql_generator import SQLGeneratorService
@@ -43,7 +43,8 @@ async def chat(request: ChatRequest):
     try:
         schema = get_schema()
         relationships = get_relationships(schema)
-        sql, valid = sql_gen.generate(request.user_query, schema, relationships)
+        descriptions = get_descriptions()
+        sql, valid = sql_gen.generate(request.user_query, schema, relationships, descriptions)
 
         dax = None
         if ENABLE_DAX:
@@ -76,6 +77,7 @@ async def execute(request: ExecuteRequest, db: Session = Depends(get_db)):
     sql_gen, _, executor = _services()
     schema = get_schema()
     relationships = get_relationships(schema)
+    descriptions = get_descriptions()
 
     sql = request.sql_query
     retries = 0
@@ -108,7 +110,7 @@ async def execute(request: ExecuteRequest, db: Session = Depends(get_db)):
         retries += 1
         logger.warning(f"Attempt {attempt + 1} failed — asking LLM to fix. Error: {error[:200]}")
         try:
-            sql = sql_gen.fix_sql(sql, error, schema, relationships)
+            sql = sql_gen.fix_sql(sql, error, schema, relationships, descriptions)
         except Exception as fix_err:
             logger.error(f"LLM fix failed: {fix_err}")
             break

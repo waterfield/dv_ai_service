@@ -1,4 +1,6 @@
+import json
 import logging
+import os
 import threading
 from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.orm import sessionmaker
@@ -114,6 +116,23 @@ def get_relationships(schema: dict) -> dict[str, str]:
         _relationships_cache = relationships
         logger.info(f"Relationships loaded: {len(relationships)} FK mappings")
         return relationships
+
+
+_descriptions: dict | None = None
+
+
+def get_descriptions() -> dict:
+    global _descriptions
+    if _descriptions is not None:
+        return _descriptions
+    path = os.path.join(os.path.dirname(__file__), "table_descriptions.json")
+    if os.path.exists(path):
+        with open(path) as f:
+            _descriptions = json.load(f)
+        logger.info(f"Table descriptions loaded: {len(_descriptions)} tables")
+    else:
+        _descriptions = {}
+    return _descriptions
 
 
 def invalidate_schema_cache() -> None:

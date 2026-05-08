@@ -1,0 +1,14 @@
+{
+  "dim_afe": {
+    "description": "Authorization for Expenditure. Each row is one AFE.",
+    "columns": {
+      "number": "Business-facing AFE identifier. use this for filtering by AFE number",
+      "combined_budget_total": "Original budget + all approved supplements — always use this for 'total budget' questions",
+      "status": "Open, Closed, Completed, Rejected or Draft — filter by status when user asks for open or active AFEs",
+      "net_interest": "Decimal working interest",
+      "completion_date": "Actual completion date — use when user asks when the AFE was completed",
+      "planned_completion_date": "Forecasted completion date — use when user asks when the AFE is due or expected to complete",
+      "closed_date": "Date the AFE was administratively closed — separate from completion_date"
+    }
+  }
+}
