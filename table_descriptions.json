@@ -8,7 +8,8 @@
       "net_interest": "Decimal working interest",
       "completion_date": "Actual completion date — use when user asks when the AFE was completed",
       "planned_completion_date": "Forecasted completion date — use when user asks when the AFE is due or expected to complete",
-      "closed_date": "Date the AFE was administratively closed — separate from completion_date"
+      "closed_date": "Date the AFE was administratively closed — separate from completion_date",
+      "cost_center_id": "provides cost center, well information"
     }
   }
 }

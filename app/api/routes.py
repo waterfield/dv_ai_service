@@ -44,7 +44,7 @@ async def chat(request: ChatRequest):
         schema = get_schema()
         relationships = get_relationships(schema)
         descriptions = get_descriptions()
-        sql, valid = sql_gen.generate(request.user_query, schema, relationships, descriptions)
+        sql, valid, reasoning = sql_gen.generate(request.user_query, schema, relationships, descriptions)
 
         dax = None
         if ENABLE_DAX:
@@ -59,6 +59,7 @@ async def chat(request: ChatRequest):
             user_query=request.user_query,
             sql_query=sql,
             dax_query=dax,
+            reasoning=reasoning or None,
             error=None if valid else "Generated SQL failed validation",
             timestamp=datetime.now().isoformat(),
         )

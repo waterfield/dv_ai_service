@@ -19,6 +19,7 @@ class ChatResponse(BaseModel):
     user_query: str
     sql_query: Optional[str] = None
     dax_query: Optional[str] = None
+    reasoning: Optional[str] = None
     error: Optional[str] = None
     timestamp: str
 

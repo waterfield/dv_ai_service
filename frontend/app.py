@@ -76,7 +76,7 @@ for i, msg in enumerate(st.session_state.messages):
             st.error(msg["exec_error"])
         elif msg.get("results") is not None:
             df = pd.DataFrame(msg["results"], columns=msg["columns"])
-            tab_table, tab_chart, tab_query = st.tabs(["Table", "Chart", "Query"])
+            tab_table, tab_chart, tab_query, tab_reasoning = st.tabs(["Table", "Chart", "Query", "Reasoning"])
             with tab_table:
                 st.dataframe(df, use_container_width=True)
                 st.caption(f"{msg['row_count']} row(s) returned")
@@ -103,6 +103,11 @@ for i, msg in enumerate(st.session_state.messages):
                         st.code(msg["dax_query"], language="python")
                     else:
                         st.info("DAX query not available")
+            with tab_reasoning:
+                if msg.get("reasoning"):
+                    st.info(msg["reasoning"])
+                else:
+                    st.caption("Reasoning not enabled. Set ENABLE_REASONING=true in backend .env.")
 
 # --- chat input ---
 if prompt := st.chat_input("Ask a question about your data..."):
@@ -122,6 +127,7 @@ if prompt := st.chat_input("Ask a question about your data..."):
             "query": prompt,
             "sql": chat_resp["sql_query"],
             "dax_query": chat_resp.get("dax_query"),
+            "reasoning": chat_resp.get("reasoning", ""),
             "results": None, "columns": [], "row_count": 0,
         }
         with st.spinner("Executing query..."):

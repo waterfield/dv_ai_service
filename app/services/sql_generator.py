@@ -2,6 +2,7 @@ import re
 import logging
 from typing import Tuple
 from app.services.llm_service import LLMService
+from config import ENABLE_REASONING
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,7 @@ class SQLGeneratorService:
     def __init__(self, llm: LLMService):
         self.llm = llm
 
-    def generate(self, user_query: str, schema: dict, relationships: dict, descriptions: dict) -> Tuple[str, bool]:
+    def generate(self, user_query: str, schema: dict, relationships: dict, descriptions: dict) -> Tuple[str, bool, str]:
         system_prompt = self._build_system_prompt(schema, relationships, descriptions)
         response = self.llm.generate(
             prompt=user_query,
@@ -23,12 +24,12 @@ class SQLGeneratorService:
             temperature=0.1,
             max_tokens=1024,
         )
-        sql = self._extract_sql(response)
+        sql, reasoning = self._extract_sql(response)
         sql = self._fix_dim_pk_references(sql, schema)
         valid, error = self._validate(sql, schema)
         if not valid:
             logger.warning(f"SQL validation failed: {error}")
-        return sql, valid
+        return sql, valid, reasoning
 
     def _build_system_prompt(self, schema: dict, relationships: dict, descriptions: dict) -> str:
         lines = []
@@ -78,7 +79,11 @@ Rules:
         budgets AS (SELECT YEAR(afe_budget_date) AS yr, SUM(amount) AS budget FROM fact_afe_budgets GROUP BY YEAR(afe_budget_date))
    SELECT a.yr, IIF(b.budget > 0, a.actual * 100.0 / b.budget, 0) AS pct FROM actuals a JOIN budgets b ON a.yr = b.yr ORDER BY a.yr
 7. Dimension tables (dim_*) use "id" as their primary key — never reference "dim_chart_of_account.chart_of_account_id", "dim_cost_center.cost_center_id", etc. Those FK columns only exist on the fact tables.
-8. For percentage, consumption, or utilization calculations (e.g. budget consumed %, variance %, utilization rate), always protect against division by zero using IIF: IIF(denominator > 0, (numerator * 100.0 / denominator), 0). Use IIF for simple conditional expressions in SQL Server instead of CASE WHEN."""
+8. For percentage, consumption, or utilization calculations (e.g. budget consumed %, variance %, utilization rate), always protect against division by zero using IIF: IIF(denominator > 0, (numerator * 100.0 / denominator), 0). Use IIF for simple conditional expressions in SQL Server instead of CASE WHEN.
+{"" if not ENABLE_REASONING else """
+Return your response in exactly this format:
+REASONING: <one sentence explaining what you understood about the question dont repeat the question. One sentence which tables, filters, columns and why>
+SQL: <query>"""}"""
 
     def _fix_dim_pk_references(self, sql: str, schema: dict) -> str:
         """Fix hallucinated FK column references on dim table aliases.
@@ -144,21 +149,22 @@ Rules:
             temperature=0.1,
             max_tokens=1024,
         )
-        fixed = self._extract_sql(response)
+        fixed, _ = self._extract_sql(response)
         fixed = self._fix_dim_pk_references(fixed, schema)
         logger.info(f"LLM fixed SQL:\n{fixed}")
         return fixed
 
-    def _extract_sql(self, response: str) -> str:
+    def _extract_sql(self, response: str) -> tuple[str, str]:
+        reasoning = ""
+        if ENABLE_REASONING and "REASONING:" in response and "SQL:" in response:
+            reasoning = response.split("REASONING:")[1].split("SQL:")[0].strip()
+            response = response.split("SQL:")[1].strip()
         if "```sql" in response:
-            sql = response.split("```sql")[1].split("```")[0].strip()
+            response = response.split("```sql")[1].split("```")[0]
         elif "```" in response:
-            sql = response.split("```")[1].split("```")[0].strip()
-        else:
-            sql = response.strip()
-        # Strip single-line comments added by weaker fallback models
-        sql = re.sub(r'--[^\n]*', '', sql)
-        return sql.strip()
+            response = response.split("```")[1].split("```")[0]
+        response = re.sub(r'--[^\n]*', '', response)
+        return response.strip(), reasoning
 
     def _validate(self, sql: str, schema: dict) -> Tuple[bool, str]:
         if not sql:
