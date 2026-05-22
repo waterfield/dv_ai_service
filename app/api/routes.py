@@ -4,31 +4,27 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from config import ENABLE_DAX
-from database import get_db, get_schema, get_relationships, get_descriptions, test_connection, invalidate_schema_cache
-from app.schemas import ChatRequest, ChatResponse, ExecuteRequest, ExecuteResponse, IterationDetail
+from database import get_db, get_schema, test_connection, invalidate_schema_cache
+from app.schemas import ChatRequest, ChatResponse, ExecuteRequest, ExecuteResponse
 from app.services.llm_service import LLMService
-from app.services.sql_generator import SQLGeneratorService
-from app.services.dax_generator import DaxGeneratorService
+from app.services.template_service import TemplateService
 from app.services.query_executor import QueryExecutorService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 _llm: LLMService | None = None
-_sql_gen: SQLGeneratorService | None = None
-_dax_gen: DaxGeneratorService | None = None
+_template_svc: TemplateService | None = None
 _executor: QueryExecutorService | None = None
 
 
-def _services() -> tuple[SQLGeneratorService, DaxGeneratorService, QueryExecutorService]:
-    global _llm, _sql_gen, _dax_gen, _executor
-    if _sql_gen is None:
+def _services() -> tuple[TemplateService, QueryExecutorService]:
+    global _llm, _template_svc, _executor
+    if _template_svc is None:
         _llm = LLMService()
-        _sql_gen = SQLGeneratorService(_llm)
-        _dax_gen = DaxGeneratorService(_llm)
+        _template_svc = TemplateService(_llm)
         _executor = QueryExecutorService()
-    return _sql_gen, _dax_gen, _executor
+    return _template_svc, _executor
 
 
 def _qid() -> str:
@@ -37,92 +33,64 @@ def _qid() -> str:
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """Generate SQL and DAX from a natural language question."""
+    """Resolve a natural language question to a pre-written SQL template + bind params."""
     qid = _qid()
-    sql_gen, dax_gen, _ = _services()
+    template_svc, _ = _services()
     try:
-        schema = get_schema()
-        relationships = get_relationships(schema)
-        descriptions = get_descriptions()
-        sql, valid, reasoning = sql_gen.generate(request.user_query, schema, relationships, descriptions)
-
-        dax = None
-        if ENABLE_DAX:
-            try:
-                dax = dax_gen.generate(request.user_query, schema)
-            except Exception as dax_err:
-                logger.warning(f"DAX generation failed (non-critical): {dax_err}")
-
+        sql, params, template_key, reasoning = template_svc.resolve(request.user_query)
         return ChatResponse(
             query_id=qid,
-            status="sql_generated" if valid else "validation_failed",
+            status="sql_generated",
             user_query=request.user_query,
             sql_query=sql,
-            dax_query=dax,
-            reasoning=reasoning or None,
-            error=None if valid else "Generated SQL failed validation",
+            template_key=template_key,
+            params=params,
+            reasoning=reasoning,
+            timestamp=datetime.now().isoformat(),
+        )
+    except ValueError as e:
+        return ChatResponse(
+            query_id=qid,
+            status="no_template",
+            user_query=request.user_query,
+            error=str(e),
             timestamp=datetime.now().isoformat(),
         )
     except Exception as e:
         logger.error(f"Chat error: {e}")
         return ChatResponse(
-            query_id=qid, status="error", user_query=request.user_query,
-            error=str(e), timestamp=datetime.now().isoformat(),
+            query_id=qid,
+            status="error",
+            user_query=request.user_query,
+            error=str(e),
+            timestamp=datetime.now().isoformat(),
         )
 
 
 @router.post("/execute", response_model=ExecuteResponse)
 async def execute(request: ExecuteRequest, db: Session = Depends(get_db)):
-    """Execute a SQL query, auto-fixing and retrying up to 3 times on error."""
+    """Execute a pre-written SQL template with bind params."""
     qid = _qid()
-    sql_gen, _, executor = _services()
-    schema = get_schema()
-    relationships = get_relationships(schema)
-    descriptions = get_descriptions()
+    _, executor = _services()
 
-    sql = request.sql_query
-    retries = 0
-    last_error = None
-    MAX_RETRIES = 3
-    iterations: list[IterationDetail] = []
+    df, error = executor.execute(request.sql_query, db, params=request.params)
 
-    for attempt in range(MAX_RETRIES + 1):
-        df, error = executor.execute(sql, db)
-        if error is None:
-            iterations.append(IterationDetail(attempt=attempt + 1, sql=sql, success=True))
-            rows = df.to_dict(orient="records")
-            return ExecuteResponse(
-                query_id=qid,
-                status="success",
-                sql_query=sql,
-                columns=list(df.columns),
-                rows=rows,
-                row_count=len(df),
-                retries=retries,
-                iterations=iterations,
-                timestamp=datetime.now().isoformat(),
-            )
-
-        iterations.append(IterationDetail(attempt=attempt + 1, sql=sql, error=error, success=False))
-        last_error = error
-        if attempt == MAX_RETRIES:
-            break
-
-        retries += 1
-        logger.warning(f"Attempt {attempt + 1} failed — asking LLM to fix. Error: {error[:200]}")
-        try:
-            sql = sql_gen.fix_sql(sql, error, schema, relationships, descriptions)
-        except Exception as fix_err:
-            logger.error(f"LLM fix failed: {fix_err}")
-            break
+    if error is None:
+        return ExecuteResponse(
+            query_id=qid,
+            status="success",
+            sql_query=request.sql_query,
+            columns=list(df.columns),
+            rows=df.to_dict(orient="records"),
+            row_count=len(df),
+            timestamp=datetime.now().isoformat(),
+        )
 
     return ExecuteResponse(
         query_id=qid,
         status="error",
-        sql_query=sql,
-        retries=retries,
-        iterations=iterations,
-        error=last_error,
+        sql_query=request.sql_query,
+        error=error,
         timestamp=datetime.now().isoformat(),
     )
 
@@ -139,7 +107,7 @@ async def schema():
 
 @router.delete("/schema/cache")
 async def clear_schema_cache():
-    """Clear the schema cache so it reloads on next request (pick up filter config changes)."""
+    """Clear the schema cache so it reloads on next request."""
     invalidate_schema_cache()
     return {"message": "Schema cache cleared"}
 
@@ -147,7 +115,7 @@ async def clear_schema_cache():
 @router.get("/history")
 async def history(limit: int = 20):
     """Return recent query execution history."""
-    *_, executor = _services()
+    _, executor = _services()
     return {"queries": executor.get_history(limit)}
 
 
