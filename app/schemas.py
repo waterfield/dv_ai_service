@@ -19,6 +19,7 @@ class ChatResponse(BaseModel):
     status: str
     user_query: str
     sql_query: Optional[str] = None
+    tool_name: Optional[str] = None
     template_key: Optional[str] = None
     params: Optional[dict] = None
     dax_query: Optional[str] = None

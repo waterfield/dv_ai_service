@@ -106,7 +106,7 @@ for i, msg in enumerate(st.session_state.messages):
                     tab_sql, tab_dax = st.tabs(["SQL", "DAX"])
                     with tab_sql:
                         if msg.get("template_key"):
-                            st.caption(f"Template: `{msg['template_key']}`")
+                            st.caption(f"Tool: `{msg.get('tool_name', '')}` · Template: `{msg['template_key']}`")
                         st.code(msg["sql"], language="sql")
                         if active_params:
                             st.caption("Parameters")
@@ -141,6 +141,7 @@ if prompt := st.chat_input("Ask a question about your data..."):
         msg = {
             "query": prompt,
             "sql": chat_resp["sql_query"],
+            "tool_name": chat_resp.get("tool_name"),
             "template_key": chat_resp.get("template_key"),
             "params": chat_resp.get("params"),
             "dax_query": chat_resp.get("dax_query"),

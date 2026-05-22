@@ -38,12 +38,13 @@ async def chat(request: ChatRequest):
     qid = _qid()
     template_svc, _ = _services()
     try:
-        sql, params, template_key, reasoning = template_svc.resolve(request.user_query)
+        sql, params, template_key, reasoning, tool_name = template_svc.resolve(request.user_query)
         return ChatResponse(
             query_id=qid,
             status="sql_generated",
             user_query=request.user_query,
             sql_query=sql,
+            tool_name=tool_name,
             template_key=template_key,
             params=params,
             reasoning=reasoning if ENABLE_REASONING else None,
