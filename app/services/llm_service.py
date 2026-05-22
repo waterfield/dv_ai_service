@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from typing import Optional
@@ -104,3 +105,45 @@ class LLMService:
                 logger.warning(f"{service}:{model} failed: {e}")
 
         raise last_error or RuntimeError("All LLM models failed")
+
+    def generate_with_tools(
+        self,
+        user_query: str,
+        tools: list[dict],
+    ) -> tuple[str, dict]:
+        """Call LLM with tool definitions. Returns (tool_name, tool_args_dict).
+
+        Raises RuntimeError if all models fail or no tool call is returned.
+        """
+        messages = [{"role": "user", "content": user_query}]
+
+        last_error = None
+        for service, model, provider_hint in self._models:
+            try:
+                client = self._get_client(service)
+                kwargs: dict = dict(
+                    model=model,
+                    messages=messages,
+                    tools=tools,
+                    tool_choice="required",
+                    max_tokens=512,
+                    temperature=0.0,
+                )
+                if service == "openrouter" and provider_hint:
+                    kwargs["extra_body"] = {
+                        "provider": {"order": [provider_hint], "allow_fallbacks": True}
+                    }
+                resp = client.chat.completions.create(**kwargs)
+                choice = resp.choices[0]
+                if not choice.message.tool_calls:
+                    raise ValueError("LLM did not return a tool call")
+                tool_call = choice.message.tool_calls[0]
+                tool_name = tool_call.function.name
+                tool_args = json.loads(tool_call.function.arguments)
+                logger.info(f"Tool selected: {tool_name} args={tool_args}")
+                return tool_name, tool_args
+            except Exception as e:
+                last_error = e
+                logger.warning(f"{service}:{model} tool-use failed: {e}")
+
+        raise last_error or RuntimeError("All LLM models failed for tool-use")
