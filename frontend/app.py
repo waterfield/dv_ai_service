@@ -91,7 +91,7 @@ for i, msg in enumerate(st.session_state.messages):
                 )
                 fig = build_figure(df, title=msg["query"], chart_type=chart_type.lower())
                 if fig:
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, use_container_width=True, key=f"chart_{i}")
                 else:
                     st.info("Cannot render this chart type with the current data")
             with tab_query:
