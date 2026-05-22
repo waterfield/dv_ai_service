@@ -42,10 +42,10 @@ def api_chat(user_query: str) -> dict:
     return r.json()
 
 
-def api_execute(sql: str) -> dict:
+def api_execute(sql: str, params: dict | None = None) -> dict:
     r = requests.post(
         f"{st.session_state.api_url}/api/execute",
-        json={"sql_query": sql},
+        json={"sql_query": sql, "params": params},
         timeout=60,
     )
     r.raise_for_status()
@@ -97,6 +97,8 @@ for i, msg in enumerate(st.session_state.messages):
             with tab_query:
                 tab_sql, tab_dax = st.tabs(["SQL", "DAX"])
                 with tab_sql:
+                    if msg.get("template_key"):
+                        st.caption(f"Template: `{msg['template_key']}`")
                     st.code(msg["sql"], language="sql")
                 with tab_dax:
                     if msg.get("dax_query"):
@@ -126,13 +128,14 @@ if prompt := st.chat_input("Ask a question about your data..."):
         msg = {
             "query": prompt,
             "sql": chat_resp["sql_query"],
+            "template_key": chat_resp.get("template_key"),
             "dax_query": chat_resp.get("dax_query"),
             "reasoning": chat_resp.get("reasoning", ""),
             "results": None, "columns": [], "row_count": 0,
         }
         with st.spinner("Executing query..."):
             try:
-                exec_resp = api_execute(chat_resp["sql_query"])
+                exec_resp = api_execute(chat_resp["sql_query"], params=chat_resp.get("params"))
                 if exec_resp.get("status") == "success":
                     msg["results"] = exec_resp["rows"]
                     msg["columns"] = exec_resp["columns"]
@@ -146,11 +149,14 @@ if prompt := st.chat_input("Ask a question about your data..."):
                 msg["exec_error"] = str(e)
         st.session_state.messages.append(msg)
     else:
+        error_msg = chat_resp.get("error", "SQL generation failed")
+        if chat_resp.get("status") == "no_template":
+            error_msg = f"No template available for this question. {error_msg}"
         st.session_state.messages.append({
             "query": prompt,
             "sql": chat_resp.get("sql_query", ""),
             "dax_query": chat_resp.get("dax_query"),
-            "chat_error": chat_resp.get("error", "SQL validation failed"),
+            "chat_error": error_msg,
             "results": None, "columns": [], "row_count": 0,
         })
     st.rerun()
