@@ -4,6 +4,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from config import ENABLE_REASONING
 from database import get_db, get_schema, test_connection, invalidate_schema_cache
 from app.schemas import ChatRequest, ChatResponse, ExecuteRequest, ExecuteResponse
 from app.services.llm_service import LLMService
@@ -45,7 +46,7 @@ async def chat(request: ChatRequest):
             sql_query=sql,
             template_key=template_key,
             params=params,
-            reasoning=reasoning,
+            reasoning=reasoning if ENABLE_REASONING else None,
             timestamp=datetime.now().isoformat(),
         )
     except ValueError as e:
