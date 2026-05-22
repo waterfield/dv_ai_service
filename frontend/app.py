@@ -9,12 +9,23 @@ load_dotenv()
 
 API_URL = os.getenv("BACKEND_API_URL", "http://localhost:8000")
 
-st.set_page_config(page_title="W AI Reporting", layout="centered")
+st.set_page_config(page_title="W AI Reporting", layout="wide", page_icon="📊")
 
-st.markdown(
-    "<style>.block-container { padding-top: 1rem; } h1 { font-size: 1.8rem !important; }</style>",
-    unsafe_allow_html=True,
-)
+st.markdown("""
+<style>
+.block-container { padding-top: 1.5rem; padding-bottom: 1rem; }
+.stChatMessage { border-radius: 12px; }
+.error-card { background: #2d1b1b; border: 1px solid #7f3535; border-radius: 10px; padding: 14px 18px; margin: 4px 0; }
+.error-card .error-title { color: #f87171; font-weight: 600; font-size: 0.95rem; margin-bottom: 8px; }
+.error-card .error-meta { color: #9ca3af; font-size: 0.8rem; margin-bottom: 8px; font-family: monospace; }
+.error-card .error-fields { color: #fca5a5; font-size: 0.85rem; line-height: 1.7; }
+.info-card { background: #1b2d2d; border: 1px solid #2d6b6b; border-radius: 10px; padding: 14px 18px; margin: 4px 0; }
+.info-card .info-title { color: #6ee7b7; font-weight: 600; font-size: 0.95rem; }
+.info-card .info-body { color: #9ca3af; font-size: 0.85rem; margin-top: 4px; }
+.status-dot-green { color: #22c55e; font-size: 12px; }
+.status-dot-red { color: #ef4444; font-size: 12px; }
+</style>
+""", unsafe_allow_html=True)
 
 # --- session state ---
 if "messages" not in st.session_state:
@@ -52,15 +63,66 @@ def api_execute(sql: str, params: dict | None = None) -> dict:
     return r.json()
 
 
+def render_error(msg: dict):
+    error_type = msg.get("chat_error_type")
+
+    if error_type == "invalid_params":
+        tool = msg.get("chat_error_tool", "")
+        template = msg.get("chat_error_template", "")
+        raw = msg.get("chat_error", "")
+        fields_html = "".join(
+            f"<div>• {f.strip()}</div>"
+            for f in raw.split(";") if f.strip()
+        )
+        meta = ""
+        if tool or template:
+            meta = f'<div class="error-meta">tool: {tool} &nbsp;·&nbsp; template: {template}</div>'
+        st.markdown(f"""
+        <div class="error-card">
+            <div class="error-title">⚠ Invalid filter values</div>
+            {meta}
+            <div class="error-fields">{fields_html}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    elif error_type == "no_template":
+        st.markdown("""
+        <div class="info-card">
+            <div class="info-title">No matching template</div>
+            <div class="info-body">This question doesn't match any available data template. Try rephrasing or ask about AFE budgets, actuals, or cost centers.</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    else:
+        st.error(msg.get("chat_error", "An error occurred"))
+
+
 # --- header ---
 connected = api_health()
-dot_color = "green" if connected else "red"
-st.markdown(
-    f'# W AI Reporting &nbsp;<span style="color:{dot_color}; font-size:20px;">●</span>',
-    unsafe_allow_html=True,
-)
+col_title, col_status = st.columns([6, 1])
+with col_title:
+    st.markdown("## 📊 W AI Reporting")
+with col_status:
+    if connected:
+        st.markdown('<p style="text-align:right; color:#22c55e; padding-top:12px;">● Connected</p>', unsafe_allow_html=True)
+    else:
+        st.markdown('<p style="text-align:right; color:#ef4444; padding-top:12px;">● Disconnected</p>', unsafe_allow_html=True)
 
 st.divider()
+
+# --- empty state ---
+if not st.session_state.messages:
+    st.markdown("""
+    <div style="text-align:center; padding: 60px 0 40px 0; color: #6b7280;">
+        <div style="font-size: 2.5rem; margin-bottom: 12px;">💬</div>
+        <div style="font-size: 1.1rem; font-weight: 600; color: #9ca3af; margin-bottom: 8px;">Ask a question about your AFE data</div>
+        <div style="font-size: 0.85rem; color: #4b5563;">
+            Try: <em>"Show me budget by cost center for 2024"</em> &nbsp;·&nbsp;
+            <em>"Top 10 AFEs by actual spend"</em> &nbsp;·&nbsp;
+            <em>"Budget vs actuals variance by year"</em>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # --- chat history ---
 for i, msg in enumerate(st.session_state.messages):
@@ -69,7 +131,7 @@ for i, msg in enumerate(st.session_state.messages):
 
     with st.chat_message("assistant"):
         if msg.get("chat_error"):
-            st.error(msg["chat_error"])
+            render_error(msg)
             continue
 
         if msg.get("exec_error"):
@@ -127,12 +189,13 @@ for i, msg in enumerate(st.session_state.messages):
 # --- chat input ---
 if prompt := st.chat_input("Ask a question about your data..."):
     chat_resp = None
-    with st.spinner("Generating SQL..."):
+    with st.spinner("Thinking..."):
         try:
             chat_resp = api_chat(prompt)
         except Exception as e:
             st.session_state.messages.append({
                 "query": prompt, "sql": "", "chat_error": str(e),
+                "chat_error_type": "generic",
                 "results": None, "columns": [], "row_count": 0,
             })
             st.rerun()
@@ -165,16 +228,14 @@ if prompt := st.chat_input("Ask a question about your data..."):
         st.session_state.messages.append(msg)
     else:
         status = chat_resp.get("status")
-        error_msg = chat_resp.get("error", "SQL generation failed")
-        if status == "no_template":
-            error_msg = f"No matching template for this question."
-        elif status == "invalid_params":
-            error_msg = f"Invalid filter values — {error_msg}"
-        st.session_state.messages.append({
+        error_entry = {
             "query": prompt,
             "sql": chat_resp.get("sql_query", ""),
-            "dax_query": chat_resp.get("dax_query"),
-            "chat_error": error_msg,
+            "chat_error_type": status,
+            "chat_error_tool": chat_resp.get("tool_name", ""),
+            "chat_error_template": chat_resp.get("template_key", ""),
+            "chat_error": chat_resp.get("error", "SQL generation failed"),
             "results": None, "columns": [], "row_count": 0,
-        })
+        }
+        st.session_state.messages.append(error_entry)
     st.rerun()

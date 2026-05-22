@@ -8,7 +8,11 @@ logger = logging.getLogger(__name__)
 
 
 class InvalidParamsError(ValueError):
-    pass
+    def __init__(self, tool_name: str, template: str, field_errors: list[str]):
+        self.tool_name = tool_name
+        self.template = template
+        self.field_errors = field_errors
+        super().__init__("; ".join(field_errors))
 
 
 class TemplateService:
@@ -31,12 +35,12 @@ class TemplateService:
                 sql, params, reasoning = resolve_afe_financial(tool_args)
             except ValidationError as e:
                 template = tool_args.get("template", "unknown")
-                msgs = [f"tool={tool_name}, template={template}"]
+                field_errors = []
                 for err in e.errors():
                     field = ".".join(str(x) for x in err["loc"]) if err["loc"] else "unknown"
                     received = err.get("input")
-                    msgs.append(f"{field}: {err['msg']} (received: {received!r})")
-                raise InvalidParamsError("; ".join(msgs))
+                    field_errors.append(f"{field}: {err['msg']} (received: {received!r})")
+                raise InvalidParamsError(tool_name, template, field_errors)
             return sql, params, tool_args.get("template", "afe_financial"), reasoning, tool_name
 
         raise ValueError(f"Unknown tool returned by LLM: {tool_name!r}")

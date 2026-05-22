@@ -55,6 +55,8 @@ async def chat(request: ChatRequest):
             query_id=qid,
             status="invalid_params",
             user_query=request.user_query,
+            tool_name=e.tool_name,
+            template_key=e.template,
             error=str(e),
             timestamp=datetime.now().isoformat(),
         )
