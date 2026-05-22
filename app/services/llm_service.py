@@ -6,14 +6,17 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-_SUPPORTED_SERVICES = {"groq", "openrouter"}
+_SUPPORTED_SERVICES = {"groq", "openrouter", "anthropic"}
 
 
 def _parse_llm_models(raw: str) -> list[tuple[str, str, str | None]]:
     """Parse LLM_MODELS string into (service, model, provider_hint) tuples.
 
     Format: service:model[@provider_hint]
-    Example: groq:llama-3.3-70b-versatile,openrouter:anthropic/claude-3-5-sonnet@Together
+    Examples:
+      anthropic:claude-sonnet-4-6
+      groq:llama-3.3-70b-versatile
+      openrouter:anthropic/claude-3-5-sonnet@Together
     """
     models = []
     for entry in raw.split(","):
@@ -38,7 +41,7 @@ class LLMService:
     def __init__(self):
         raw = os.getenv("LLM_MODELS", "").strip()
         if not raw:
-            raise ValueError("LLM_MODELS is not set. Define at least one entry, e.g. groq:llama-3.3-70b-versatile")
+            raise ValueError("LLM_MODELS is not set. Define at least one entry, e.g. anthropic:claude-sonnet-4-6")
         self._models = _parse_llm_models(raw)
         self._clients: dict[str, object] = {}
         logger.info(f"LLM models: {[(s, m) for s, m, _ in self._models]}")
@@ -47,7 +50,14 @@ class LLMService:
         if service in self._clients:
             return self._clients[service]
 
-        if service == "groq":
+        if service == "anthropic":
+            import anthropic
+            api_key = os.getenv("ANTHROPIC_API_KEY", "")
+            if not api_key:
+                raise ValueError("ANTHROPIC_API_KEY is required when using anthropic service")
+            client = anthropic.Anthropic(api_key=api_key)
+
+        elif service == "groq":
             from groq import Groq
             api_key = os.getenv("GROQ_API_KEY", "")
             if not api_key:
@@ -78,21 +88,26 @@ class LLMService:
         temperature: float = 0.1,
         max_tokens: int = 1024,
     ) -> str:
-        messages = []
-        if system_message:
-            messages.append({"role": "system", "content": system_message})
-        messages.append({"role": "user", "content": prompt})
-
         last_error = None
         for service, model, provider_hint in self._models:
             try:
                 client = self._get_client(service)
-                kwargs: dict = dict(
-                    model=model,
-                    messages=messages,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                )
+
+                if service == "anthropic":
+                    kwargs: dict = dict(model=model, max_tokens=max_tokens, temperature=temperature,
+                                        messages=[{"role": "user", "content": prompt}])
+                    if system_message:
+                        kwargs["system"] = system_message
+                    resp = client.messages.create(**kwargs)
+                    logger.info(f"LLM response from {service}:{model}")
+                    return resp.content[0].text
+
+                # OpenAI-compatible (groq, openrouter)
+                messages = []
+                if system_message:
+                    messages.append({"role": "system", "content": system_message})
+                messages.append({"role": "user", "content": prompt})
+                kwargs = dict(model=model, messages=messages, temperature=temperature, max_tokens=max_tokens)
                 if service == "openrouter" and provider_hint:
                     kwargs["extra_body"] = {
                         "provider": {"order": [provider_hint], "allow_fallbacks": True}
@@ -100,6 +115,7 @@ class LLMService:
                 resp = client.chat.completions.create(**kwargs)
                 logger.info(f"LLM response from {service}:{model}")
                 return resp.choices[0].message.content
+
             except Exception as e:
                 last_error = e
                 logger.warning(f"{service}:{model} failed: {e}")
@@ -113,17 +129,44 @@ class LLMService:
     ) -> tuple[str, dict]:
         """Call LLM with tool definitions. Returns (tool_name, tool_args_dict).
 
+        tools must be in OpenAI function-calling format:
+          [{"type": "function", "function": {"name": ..., "description": ..., "parameters": {...}}}]
+
+        Anthropic format is derived internally.
         Raises RuntimeError if all models fail or no tool call is returned.
         """
-        messages = [{"role": "user", "content": user_query}]
-
         last_error = None
         for service, model, provider_hint in self._models:
             try:
                 client = self._get_client(service)
+
+                if service == "anthropic":
+                    anthropic_tools = [
+                        {
+                            "name": t["function"]["name"],
+                            "description": t["function"]["description"],
+                            "input_schema": t["function"]["parameters"],
+                        }
+                        for t in tools
+                    ]
+                    resp = client.messages.create(
+                        model=model,
+                        max_tokens=512,
+                        temperature=0.0,
+                        messages=[{"role": "user", "content": user_query}],
+                        tools=anthropic_tools,
+                        tool_choice={"type": "any"},
+                    )
+                    for block in resp.content:
+                        if block.type == "tool_use":
+                            logger.info(f"Tool selected: {block.name} args={block.input}")
+                            return block.name, block.input
+                    raise ValueError("Anthropic did not return a tool use block")
+
+                # OpenAI-compatible (groq, openrouter)
                 kwargs: dict = dict(
                     model=model,
-                    messages=messages,
+                    messages=[{"role": "user", "content": user_query}],
                     tools=tools,
                     tool_choice="required",
                     max_tokens=512,
@@ -142,6 +185,7 @@ class LLMService:
                 tool_args = json.loads(tool_call.function.arguments)
                 logger.info(f"Tool selected: {tool_name} args={tool_args}")
                 return tool_name, tool_args
+
             except Exception as e:
                 last_error = e
                 logger.warning(f"{service}:{model} tool-use failed: {e}")

@@ -105,7 +105,10 @@ The `/execute` endpoint does one execution attempt and returns. Pre-written SQL 
 `LLMService`, `TemplateService`, and `QueryExecutorService` are not created at import time. `_services()` creates them on the first request and returns the same instances thereafter. Schema is fetched lazily and cached with a threading lock in `database.py` (pool_size=5, max_overflow=10, pre-ping enabled).
 
 **Multi-provider LLM dispatch** (`llm_service.py`)
-`LLM_MODELS` is parsed into `(service, model, provider_hint)` tuples. Tried in order; falls through on error. Both `generate()` (plain text) and `generate_with_tools()` (tool-use) follow the same fallback chain. Format: `groq:llama-3.3-70b-versatile,openrouter:anthropic/claude-3-5-sonnet@Together`. Provider hint passes `provider.order` to OpenRouter. OpenRouter client uses `X-Data-Collection: deny` header.
+`LLM_MODELS` is parsed into `(service, model, provider_hint)` tuples. Tried in order; falls through on error. Both `generate()` (plain text) and `generate_with_tools()` (tool-use) follow the same fallback chain. Supported services: `anthropic` (primary), `groq`, `openrouter`. Format: `anthropic:claude-sonnet-4-6` or `groq:llama-3.3-70b-versatile,openrouter:anthropic/claude-3-5-sonnet@Together`. Provider hint passes `provider.order` to OpenRouter. OpenRouter client uses `X-Data-Collection: deny` header.
+
+**Anthropic vs OpenAI-compatible tool format** (`llm_service.py`)
+Tool definitions in `tools/` use OpenAI function-calling format. When the active service is `anthropic`, `generate_with_tools()` converts them internally: `parameters` → `input_schema`, strips `type: function` wrapper, uses `tool_choice={"type": "any"}` instead of `"required"`. Anthropic response blocks are iterated for `block.type == "tool_use"` to extract `block.name` and `block.input`. For plain `generate()`, Anthropic system prompts are passed as the `system=` parameter (not in the messages list).
 
 **Adding a new tool** (`tools/`)
 1. Create `app/services/tools/<domain>.py` — define a Pydantic model with `Literal` template field, write SQL templates in `AFE_FINANCIAL_TEMPLATES`-style dict, write `resolve_<domain>()`, build tool definition via `model_json_schema()`

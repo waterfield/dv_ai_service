@@ -3,6 +3,7 @@ uvicorn[standard]==0.30.0
 sqlalchemy==2.0.35
 pyodbc==5.1.0
 pandas==2.2.0
+anthropic>=0.40.0
 groq==0.11.0
 openai==1.82.0
 pydantic-settings==2.4.0
