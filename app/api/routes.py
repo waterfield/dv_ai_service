@@ -8,7 +8,7 @@ from config import SHOW_TEMPLATE_DESCRIPTION
 from database import get_db, get_schema, test_connection, invalidate_schema_cache
 from app.schemas import ChatRequest, ChatResponse, ExecuteRequest, ExecuteResponse
 from app.services.llm_service import LLMService
-from app.services.template_service import TemplateService
+from app.services.template_service import TemplateService, InvalidParamsError
 from app.services.query_executor import QueryExecutorService
 
 logger = logging.getLogger(__name__)
@@ -48,6 +48,14 @@ async def chat(request: ChatRequest):
             template_key=template_key,
             params=params,
             reasoning=reasoning if SHOW_TEMPLATE_DESCRIPTION else None,
+            timestamp=datetime.now().isoformat(),
+        )
+    except InvalidParamsError as e:
+        return ChatResponse(
+            query_id=qid,
+            status="invalid_params",
+            user_query=request.user_query,
+            error=str(e),
             timestamp=datetime.now().isoformat(),
         )
     except ValueError as e:

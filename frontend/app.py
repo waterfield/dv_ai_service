@@ -164,9 +164,12 @@ if prompt := st.chat_input("Ask a question about your data..."):
                 msg["exec_error"] = str(e)
         st.session_state.messages.append(msg)
     else:
+        status = chat_resp.get("status")
         error_msg = chat_resp.get("error", "SQL generation failed")
-        if chat_resp.get("status") == "no_template":
-            error_msg = f"No template available for this question. {error_msg}"
+        if status == "no_template":
+            error_msg = f"No matching template for this question."
+        elif status == "invalid_params":
+            error_msg = f"Invalid filter values — {error_msg}"
         st.session_state.messages.append({
             "query": prompt,
             "sql": chat_resp.get("sql_query", ""),
