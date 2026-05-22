@@ -14,7 +14,6 @@ class AFEFinancialRequest(BaseModel):
       budget_by_afe                     -> budget per individual AFE
       budget_by_year                    -> budget trend over years
       budget_by_quarter                 -> budget trend by quarter
-      budget_by_region                  -> budget by geographic region
       budget_total                      -> single grand total
       actuals_by_cost_center            -> actual spend by department
       actuals_by_afe                    -> actual spend per AFE
@@ -35,7 +34,6 @@ class AFEFinancialRequest(BaseModel):
         "budget_by_afe",
         "budget_by_year",
         "budget_by_quarter",
-        "budget_by_region",
         "budget_total",
         "actuals_by_cost_center",
         "actuals_by_afe",
@@ -52,8 +50,8 @@ class AFEFinancialRequest(BaseModel):
     ]
 
     year:       int | None = Field(None, ge=2000, le=2030, description="Budget/actuals year")
-    status:     Literal["Open", "Approved", "Closed", "On Hold"] | None = None
-    afe_type:   Literal["Capital", "Expense", "Workover"] | None = None
+    status:     Literal["Open", "Completed", "Rejected"] | None = None
+    afe_type_description:   Literal["Expense Workover", "Plug & Abandonment", "Recompletion", "Reclamation", "Stake & Permit", "Facility", "Land/Acquisition", "Nonop Drill & Complete", "Environmental", "Lease and Well Equipment", "Other", "Geological & Geospatial", "Drill & Complete", "Internal"] | None = None
     afe_number: str | None = Field(None, description="Specific AFE identifier e.g. AFE-2025-001")
     top_n:      int = Field(20, ge=1, le=100, description="Maximum rows to return")
 
@@ -63,7 +61,6 @@ TEMPLATE_DESCRIPTIONS: dict[str, str] = {
     "budget_by_afe":                    "Budget per individual AFE",
     "budget_by_year":                   "Budget trend over years",
     "budget_by_quarter":                "Budget trend by quarter",
-    "budget_by_region":                 "Budget by geographic region",
     "budget_total":                     "Grand total budget amount and AFE count",
     "actuals_by_cost_center":           "Actual spend by cost center",
     "actuals_by_afe":                   "Actual spend per AFE",
@@ -90,7 +87,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         JOIN dim_afe da         ON fb.afe_id = da.id
         WHERE (:year     IS NULL OR YEAR(fb.afe_budget_date) = :year)
           AND (:status   IS NULL OR da.status   = :status)
-          AND (:afe_type IS NULL OR da.afe_type = :afe_type)
+          AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
         GROUP BY dc.name
         ORDER BY [Budget Amount] DESC
     """,
@@ -105,7 +102,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         JOIN dim_afe da ON fb.afe_id = da.id
         WHERE (:year       IS NULL OR YEAR(fb.afe_budget_date) = :year)
           AND (:status     IS NULL OR da.status     = :status)
-          AND (:afe_type   IS NULL OR da.afe_type   = :afe_type)
+          AND (:afe_type_description   IS NULL OR da.afe_type_description   = :afe_type_description)
           AND (:afe_number IS NULL OR da.afe_number = :afe_number)
         GROUP BY da.afe_number, da.name, da.status
         ORDER BY [Budget Amount] DESC
@@ -118,7 +115,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         FROM fact_afe_budgets fb
         JOIN dim_afe da ON fb.afe_id = da.id
         WHERE (:status   IS NULL OR da.status   = :status)
-          AND (:afe_type IS NULL OR da.afe_type = :afe_type)
+          AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
         GROUP BY YEAR(fb.afe_budget_date)
         ORDER BY [Year] DESC
     """,
@@ -136,19 +133,6 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         ORDER BY [Year] DESC, [Quarter] ASC
     """,
 
-    "budget_by_region": """
-        SELECT TOP (:top_n)
-            da.region                           AS [Region],
-            SUM(fb.amount)                      AS [Budget Amount],
-            COUNT(DISTINCT da.afe_number)       AS [AFE Count]
-        FROM fact_afe_budgets fb
-        JOIN dim_afe da ON fb.afe_id = da.id
-        WHERE (:year   IS NULL OR YEAR(fb.afe_budget_date) = :year)
-          AND (:status IS NULL OR da.status = :status)
-        GROUP BY da.region
-        ORDER BY [Budget Amount] DESC
-    """,
-
     "budget_total": """
         SELECT
             SUM(fb.amount)                  AS [Budget Amount],
@@ -157,7 +141,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         JOIN dim_afe da ON fb.afe_id = da.id
         WHERE (:year     IS NULL OR YEAR(fb.afe_budget_date) = :year)
           AND (:status   IS NULL OR da.status   = :status)
-          AND (:afe_type IS NULL OR da.afe_type = :afe_type)
+          AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
     """,
 
     "actuals_by_cost_center": """
@@ -169,7 +153,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         JOIN dim_afe da         ON fa.afe_id = da.id
         WHERE (:year     IS NULL OR YEAR(fa.accounting_date) = :year)
           AND (:status   IS NULL OR da.status   = :status)
-          AND (:afe_type IS NULL OR da.afe_type = :afe_type)
+          AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
         GROUP BY dc.name
         ORDER BY [Actual Amount] DESC
     """,
@@ -196,7 +180,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         FROM fact_afe_actuals fa
         JOIN dim_afe da ON fa.afe_id = da.id
         WHERE (:status   IS NULL OR da.status   = :status)
-          AND (:afe_type IS NULL OR da.afe_type = :afe_type)
+          AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
         GROUP BY YEAR(fa.accounting_date)
         ORDER BY [Year] DESC
     """,
@@ -234,7 +218,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             FROM fact_afe_budgets fb
             JOIN dim_afe da ON fb.afe_id = da.id
             WHERE (:status   IS NULL OR da.status   = :status)
-              AND (:afe_type IS NULL OR da.afe_type = :afe_type)
+              AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
             GROUP BY YEAR(fb.afe_budget_date)
         ),
         actuals AS (
@@ -243,7 +227,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             FROM fact_afe_actuals fa
             JOIN dim_afe da ON fa.afe_id = da.id
             WHERE (:status   IS NULL OR da.status   = :status)
-              AND (:afe_type IS NULL OR da.afe_type = :afe_type)
+              AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
             GROUP BY YEAR(fa.accounting_date)
         )
         SELECT TOP (:top_n)
@@ -489,7 +473,7 @@ def resolve_afe_financial(tool_args: dict) -> tuple[str, dict, str]:
     params = {
         "year":       request.year,
         "status":     request.status,
-        "afe_type":   request.afe_type,
+        "afe_type_description":   request.afe_type_description,
         "afe_number": request.afe_number,
         "top_n":      request.top_n,
     }
