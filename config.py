@@ -26,7 +26,7 @@ ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
 GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
 OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
 ENABLE_DAX: bool = os.getenv("ENABLE_DAX", "false").lower() == "true"
-ENABLE_REASONING: bool = os.getenv("ENABLE_REASONING", "false").lower() == "true"
+SHOW_TEMPLATE_DESCRIPTION: bool = os.getenv("SHOW_TEMPLATE_DESCRIPTION", "false").lower() == "true"
 
 # Single SQL Server schema to introspect — multiple schemas are not supported
 _raw_schema = os.getenv("DATABASE_SCHEMA", "dbo").strip()
