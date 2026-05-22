@@ -101,18 +101,25 @@ for i, msg in enumerate(st.session_state.messages):
                 else:
                     st.info("Cannot render this chart type with the current data")
             with tab_query:
+                active_params = {k: v for k, v in (msg.get("params") or {}).items() if v is not None}
                 if msg.get("dax_query"):
                     tab_sql, tab_dax = st.tabs(["SQL", "DAX"])
                     with tab_sql:
                         if msg.get("template_key"):
                             st.caption(f"Template: `{msg['template_key']}`")
                         st.code(msg["sql"], language="sql")
+                        if active_params:
+                            st.caption("Parameters")
+                            st.json(active_params)
                     with tab_dax:
                         st.code(msg["dax_query"], language="python")
                 else:
                     if msg.get("template_key"):
                         st.caption(f"Template: `{msg['template_key']}`")
                     st.code(msg["sql"], language="sql")
+                    if active_params:
+                        st.caption("Parameters")
+                        st.json(active_params)
             if tab_reasoning:
                 with tab_reasoning:
                     st.info(msg["reasoning"])
