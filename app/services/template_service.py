@@ -30,7 +30,8 @@ class TemplateService:
             try:
                 sql, params, reasoning = resolve_afe_financial(tool_args)
             except ValidationError as e:
-                msgs = []
+                template = tool_args.get("template", "unknown")
+                msgs = [f"tool={tool_name}, template={template}"]
                 for err in e.errors():
                     field = ".".join(str(x) for x in err["loc"]) if err["loc"] else "unknown"
                     received = err.get("input")
