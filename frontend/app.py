@@ -142,6 +142,7 @@ if prompt := st.chat_input("Ask a question about your data..."):
             "query": prompt,
             "sql": chat_resp["sql_query"],
             "template_key": chat_resp.get("template_key"),
+            "params": chat_resp.get("params"),
             "dax_query": chat_resp.get("dax_query"),
             "reasoning": chat_resp.get("reasoning", ""),
             "results": None, "columns": [], "row_count": 0,
