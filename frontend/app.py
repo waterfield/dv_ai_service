@@ -76,7 +76,13 @@ for i, msg in enumerate(st.session_state.messages):
             st.error(msg["exec_error"])
         elif msg.get("results") is not None:
             df = pd.DataFrame(msg["results"], columns=msg["columns"])
-            tab_table, tab_chart, tab_query, tab_reasoning = st.tabs(["Table", "Chart", "Query", "Reasoning"])
+            tab_names = ["Table", "Chart", "Query"]
+            if msg.get("reasoning"):
+                tab_names.append("Reasoning")
+            tabs = st.tabs(tab_names)
+            tab_table, tab_chart, tab_query = tabs[0], tabs[1], tabs[2]
+            tab_reasoning = tabs[3] if len(tabs) > 3 else None
+
             with tab_table:
                 st.dataframe(df, use_container_width=True)
                 st.caption(f"{msg['row_count']} row(s) returned")
@@ -95,21 +101,21 @@ for i, msg in enumerate(st.session_state.messages):
                 else:
                     st.info("Cannot render this chart type with the current data")
             with tab_query:
-                tab_sql, tab_dax = st.tabs(["SQL", "DAX"])
-                with tab_sql:
+                if msg.get("dax_query"):
+                    tab_sql, tab_dax = st.tabs(["SQL", "DAX"])
+                    with tab_sql:
+                        if msg.get("template_key"):
+                            st.caption(f"Template: `{msg['template_key']}`")
+                        st.code(msg["sql"], language="sql")
+                    with tab_dax:
+                        st.code(msg["dax_query"], language="python")
+                else:
                     if msg.get("template_key"):
                         st.caption(f"Template: `{msg['template_key']}`")
                     st.code(msg["sql"], language="sql")
-                with tab_dax:
-                    if msg.get("dax_query"):
-                        st.code(msg["dax_query"], language="python")
-                    else:
-                        st.info("DAX query not available")
-            with tab_reasoning:
-                if msg.get("reasoning"):
+            if tab_reasoning:
+                with tab_reasoning:
                     st.info(msg["reasoning"])
-                else:
-                    st.caption("Reasoning not enabled. Set ENABLE_REASONING=true in backend .env.")
 
 # --- chat input ---
 if prompt := st.chat_input("Ask a question about your data..."):
