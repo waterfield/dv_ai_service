@@ -9,6 +9,7 @@ class ChatRequest(BaseModel):
 
 class ExecuteRequest(BaseModel):
     sql_query: str
+    params: Optional[dict] = None
     user_query: Optional[str] = None
     session_id: Optional[str] = None
 
@@ -18,6 +19,8 @@ class ChatResponse(BaseModel):
     status: str
     user_query: str
     sql_query: Optional[str] = None
+    template_key: Optional[str] = None
+    params: Optional[dict] = None
     dax_query: Optional[str] = None
     reasoning: Optional[str] = None
     error: Optional[str] = None
