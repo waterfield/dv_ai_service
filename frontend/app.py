@@ -115,7 +115,7 @@ for i, msg in enumerate(st.session_state.messages):
                         st.code(msg["dax_query"], language="python")
                 else:
                     if msg.get("template_key"):
-                        st.caption(f"Template: `{msg['template_key']}`")
+                        st.caption(f"Tool: `{msg.get('tool_name', '')}` · Template: `{msg['template_key']}`")
                     st.code(msg["sql"], language="sql")
                     if active_params:
                         st.caption("Parameters")
