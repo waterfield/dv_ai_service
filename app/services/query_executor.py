@@ -18,6 +18,7 @@ class QueryExecutorService:
         self,
         sql: str,
         db: Session,
+        params: dict | None = None,
         timeout: int = 30,
     ) -> Tuple[Optional[pd.DataFrame], Optional[str]]:
         err = self._validate(sql)
@@ -26,7 +27,7 @@ class QueryExecutorService:
 
         start = datetime.now()
         try:
-            result = db.execute(text(sql))
+            result = db.execute(text(sql), params or {})
             rows = result.fetchall()
             columns = list(result.keys())
             df = pd.DataFrame(rows, columns=columns) if rows else pd.DataFrame(columns=columns)
