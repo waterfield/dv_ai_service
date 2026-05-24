@@ -3,6 +3,7 @@ from pydantic import ValidationError
 from app.services.llm_service import LLMService
 from app.services.tools import ALL_TOOLS
 from app.services.tools.afe_financial import resolve_afe_financial
+from app.services.tools.afe_master import resolve_afe_master
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +31,15 @@ class TemplateService:
         if tool_name == "unknown_query":
             raise ValueError("Question not covered by any available template")
 
+        resolver = None
         if tool_name == "afe_financial":
+            resolver = resolve_afe_financial
+        elif tool_name == "afe_master":
+            resolver = resolve_afe_master
+
+        if resolver:
             try:
-                sql, params, reasoning = resolve_afe_financial(tool_args)
+                sql, params, reasoning = resolver(tool_args)
             except ValidationError as e:
                 template = tool_args.get("template", "unknown")
                 field_errors = []
@@ -41,6 +48,6 @@ class TemplateService:
                     received = err.get("input")
                     field_errors.append(f"{field}: {err['msg']} (received: {received!r})")
                 raise InvalidParamsError(tool_name, template, field_errors)
-            return sql, params, tool_args.get("template", "afe_financial"), reasoning, tool_name
+            return sql, params, tool_args.get("template", tool_name), reasoning, tool_name
 
         raise ValueError(f"Unknown tool returned by LLM: {tool_name!r}")

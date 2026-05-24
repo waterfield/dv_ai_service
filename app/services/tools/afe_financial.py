@@ -245,7 +245,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
 
     "budget_vs_actuals_by_afe": """
         WITH budgets AS (
-            SELECT da.number, da.name, da.status,
+            SELECT da.number afe_number, da.name, da.status,
                    SUM(fb.amount)  AS [Budget Amount]
             FROM fact_afe_budgets fb
             JOIN dim_afe da ON fb.afe_id = da.id
@@ -254,7 +254,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             GROUP BY da.number, da.name, da.status
         ),
         actuals AS (
-            SELECT da.number,
+            SELECT da.number afe_number,
                    SUM(fa.amount)  AS [Actual Amount]
             FROM fact_afe_actuals fa
             JOIN dim_afe da ON fa.afe_id = da.id

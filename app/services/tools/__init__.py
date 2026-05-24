@@ -1,4 +1,5 @@
 from app.services.tools.afe_financial import AFE_TOOL_DEFINITION
+from app.services.tools.afe_master import AFE_MASTER_TOOL_DEFINITION
 
 UNKNOWN_QUERY_TOOL = {
     "type": "function",
@@ -9,4 +10,4 @@ UNKNOWN_QUERY_TOOL = {
     },
 }
 
-ALL_TOOLS = [AFE_TOOL_DEFINITION, UNKNOWN_QUERY_TOOL]
+ALL_TOOLS = [AFE_TOOL_DEFINITION, AFE_MASTER_TOOL_DEFINITION, UNKNOWN_QUERY_TOOL]
