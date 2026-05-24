@@ -110,6 +110,37 @@ with col_status:
 
 st.divider()
 
+with st.sidebar:
+    st.markdown("### 💡 What can I ask?")
+
+    with st.expander("💰 Budget"):
+        st.caption("Show me budget by cost center for 2024")
+        st.caption("Budget per AFE this year")
+        st.caption("Budget trend by year")
+        st.caption("Budget by quarter for 2025")
+        st.caption("What is the total budget?")
+
+    with st.expander("📊 Actuals"):
+        st.caption("Show actual spend by cost center")
+        st.caption("Top 10 AFEs by actual spend")
+        st.caption("Actual spend trend by year")
+        st.caption("Actuals by quarter for 2024")
+        st.caption("Show actuals by region")
+
+    with st.expander("⚖️ Comparisons & Analysis"):
+        st.caption("Budget vs actuals variance by year")
+        st.caption("Budget vs actuals per AFE")
+        st.caption("What % of budget is consumed by cost center?")
+        st.caption("Full financial picture per AFE")
+        st.caption("Which AFEs have the least remaining budget?")
+
+    with st.expander("🗂️ AFE Master Data"):
+        st.caption("List all open AFEs")
+        st.caption("Show details for AFE-2025-001")
+        st.caption("Which AFEs are past their completion date?")
+        st.caption("Show rejected AFEs with reasons")
+        st.caption("AFEs coming up for completion soon")
+
 # --- empty state ---
 if not st.session_state.messages:
     st.markdown("""
@@ -119,7 +150,8 @@ if not st.session_state.messages:
         <div style="font-size: 0.85rem; color: #4b5563;">
             Try: <em>"Show me budget by cost center for 2024"</em> &nbsp;·&nbsp;
             <em>"Top 10 AFEs by actual spend"</em> &nbsp;·&nbsp;
-            <em>"Budget vs actuals variance by year"</em>
+            <em>"Budget vs actuals variance by year"</em><br><br>
+            See <strong>💡 What can I ask?</strong> in the sidebar for all available questions.
         </div>
     </div>
     """, unsafe_allow_html=True)
