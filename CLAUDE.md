@@ -74,14 +74,16 @@ Optional schema filtering:
 | `app/schemas.py` | Pydantic models: `ChatRequest`, `ChatResponse` (includes `tool_name`, `template_key`, `params`), `ExecuteRequest` (includes `params`), `ExecuteResponse` |
 | `app/services/template_service.py` | `TemplateService.resolve()` — calls LLM, dispatches to per-tool resolver, catches `ValidationError` → `InvalidParamsError`, handles `unknown_query` sentinel |
 | `app/services/tools/__init__.py` | Exports `ALL_TOOLS` list (all tool definitions + `unknown_query` sentinel) |
-| `app/services/tools/afe_financial.py` | `AFEFinancialRequest` Pydantic model, 17 SQL templates, `resolve_afe_financial()`, `AFE_TOOL_DEFINITION` |
-| `app/services/tools/afe_master.py` | `AFEMasterRequest` Pydantic model, 10 SQL templates for AFE master data, `resolve_afe_master()`, `AFE_MASTER_TOOL_DEFINITION` |
+| `app/services/tools/afe_financial.py` | `AFEFinancialRequest` Pydantic model, 17 SQL templates, `resolve_afe_financial()`, `AFE_TOOL_DEFINITION`; filter params: `year`, `status`, `afe_type_description`, `afe_number`, `top_n` |
+| `app/services/tools/afe_master.py` | `AFEMasterRequest` Pydantic model, 10 SQL templates for AFE master data, `resolve_afe_master()`, `AFE_MASTER_TOOL_DEFINITION`; filter params: same as `afe_financial` plus `afe_project_name` and `company_name` |
 | `app/services/llm_service.py` | Multi-provider LLM dispatcher (Anthropic primary, Groq, OpenRouter); `generate()` for plain text, `generate_with_tools()` for tool-use |
 | `app/services/query_executor.py` | Single-attempt SQL execution via `db.execute(text(sql), params)`, module-level history list |
 | `app/services/sql_generator.py` | **Unused** — previous LLM SQL generation approach; kept for reference |
 | `app/services/dax_generator.py` | **Unused** — DAX query generation; kept for reference |
-| `database.py` | SQLAlchemy engine + pool, `inspect`-based schema + FK relationship loading, table descriptions loader, thread-safe caches |
-| `config.py` | `os.getenv`-based config; builds `DATABASE_URL`; parses `LLM_MODELS`, `DATABASE_SCHEMA`, filter lists, `SHOW_TEMPLATE_DESCRIPTION` |
+| `database.py` | SQLAlchemy engine + pool, `inspect`-based schema + FK relationship loading, `get_descriptions()` loads `table_descriptions.json` (not called by any endpoint — available for future use), thread-safe caches |
+| `config.py` | `os.getenv`-based config; builds `DATABASE_URL`; parses `LLM_MODELS`, `DATABASE_SCHEMA`, filter lists, `SHOW_TEMPLATE_DESCRIPTION`; `DEBUG` defaults to `True` (SQLAlchemy echo on — set `DEBUG=False` in production) |
+| `table_descriptions.json` | Optional JSON file mapping table names to descriptions; loaded by `database.py:get_descriptions()` but not wired to any API endpoint yet |
+| `docs/` | Research docs (`docs/research/`) and implementation plans (`docs/superpowers/plans/`) — not production code |
 | `frontend/app.py` | Streamlit chat UI (wide layout), sidebar with example questions, session state, API calls (60s timeout), tab result display, `render_error()` for structured error cards |
 | `frontend/charts.py` | Plotly chart builder (Auto/Bar/Line/Pie) with `_coerce_numerics` pre-pass |
 | `frontend/pages/execution_details.py` | Debug page (legacy — retries no longer occur) |
@@ -93,8 +95,8 @@ Optional schema filtering:
 `TemplateService.resolve()` calls the LLM with OpenAI-compatible function definitions. The LLM picks a tool (e.g. `afe_financial`), a template key (e.g. `budget_vs_actuals_by_afe`), and typed filter values (e.g. `year=2025`). Pydantic validates against `Literal` enums and range constraints. A dict lookup returns the pre-written SQL string. The LLM never sees a cursor or writes a character of SQL.
 
 **Two tools, distinct domains** (`tools/afe_financial.py`, `tools/afe_master.py`)
-- `afe_financial` — budget, actuals, commitments, spend analysis; 17 templates on `fact_afe_budgets`, `fact_afe_actuals`, `fact_afe_commitments`
-- `afe_master` — AFE attributes, listings, timelines, approvals, rejections; 10 templates on `dim_afe`
+- `afe_financial` — budget, actuals, commitments, spend analysis; 17 templates on `fact_afe_budgets`, `fact_afe_actuals`, `fact_afe_commitments`; filter params: `year`, `status`, `afe_type_description`, `afe_number`, `top_n`
+- `afe_master` — AFE attributes, listings, timelines, approvals, rejections; 10 templates on `dim_afe`; filter params: same as `afe_financial` plus `afe_project_name` (project name exact match) and `company_name` (company exact match)
 Tool docstrings explicitly tell the LLM which to use and when NOT to use each.
 
 **NULL filter pattern** (`tools/`)
