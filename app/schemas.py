@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, Any
+from typing import Optional, Any, Literal
 
 
 class ChatRequest(BaseModel):
@@ -33,6 +33,26 @@ class IterationDetail(BaseModel):
     sql: str
     error: Optional[str] = None
     success: bool = False
+
+
+class ChartConfig(BaseModel):
+    type: Literal["bar", "line", "pie", "scatter", "area", "table"]
+    x_col: str
+    y_cols: list[str]
+    title: str
+
+
+class AnalyzeRequest(BaseModel):
+    user_query: str
+    columns: list[str]
+    rows: list[dict]
+    row_count: int
+    session_id: Optional[str] = None
+
+
+class AnalyzeResponse(BaseModel):
+    summary: str
+    chart: ChartConfig
 
 
 class ExecuteResponse(BaseModel):
