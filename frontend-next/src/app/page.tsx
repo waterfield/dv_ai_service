@@ -134,7 +134,7 @@ export default function Home() {
         {/* Footer */}
         <Box sx={{ px: 2, py: 1.5, borderTop: '1px solid rgba(255,255,255,0.12)' }}>
           <Typography variant="caption" sx={{ color: '#f5a623', fontWeight: 600, fontSize: 10 }}>
-            Powered by Wenergy AI
+            Powered by W Energy AI
           </Typography>
         </Box>
       </Drawer>
