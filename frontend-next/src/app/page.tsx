@@ -116,7 +116,7 @@ export default function Home() {
             W
           </Box>
           <Typography variant="h6" noWrap sx={{ fontSize: 15, color: '#fff', lineHeight: 1.2 }}>
-            W ChatSQL
+            W AI Reporting
           </Typography>
         </Box>
 
