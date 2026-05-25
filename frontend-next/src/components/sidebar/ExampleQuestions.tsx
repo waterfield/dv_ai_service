@@ -17,7 +17,6 @@ const EXAMPLES = [
   { q: 'Show rejected AFEs with reasons', icon: WarningAmberIcon, color: '#8b5cf6' },
   { q: 'Budget trend by year', icon: TrendingUpIcon, color: '#22c55e' },
   { q: 'Upcoming completions in the next 60 days', icon: CalendarMonthIcon, color: '#3b82f6' },
-  { q: 'Actual spend by region', icon: PieChartIcon, color: '#f5a623' },
 ];
 
 interface Props {

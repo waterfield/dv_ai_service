@@ -19,7 +19,6 @@ class AFEFinancialRequest(BaseModel):
       actuals_by_afe                    -> actual spend per AFE
       actuals_by_year                   -> actual spend trend by year
       actuals_by_quarter                -> actual spend trend by quarter
-      actuals_by_region                 -> actual spend by region
       budget_vs_actuals_by_year         -> budget vs actuals comparison with variance by year
       budget_vs_actuals_by_afe          -> budget vs actuals comparison per AFE
       budget_vs_actuals_by_cost_center  -> budget vs actuals comparison by department
@@ -39,7 +38,6 @@ class AFEFinancialRequest(BaseModel):
         "actuals_by_afe",
         "actuals_by_year",
         "actuals_by_quarter",
-        "actuals_by_region",
         "budget_vs_actuals_by_year",
         "budget_vs_actuals_by_afe",
         "budget_vs_actuals_by_cost_center",
@@ -66,7 +64,6 @@ TEMPLATE_DESCRIPTIONS: dict[str, str] = {
     "actuals_by_afe":                   "Actual spend per AFE",
     "actuals_by_year":                  "Actual spend trend by year",
     "actuals_by_quarter":               "Actual spend trend by quarter",
-    "actuals_by_region":                "Actual spend by geographic region",
     "budget_vs_actuals_by_year":        "Budget vs actuals with variance by year",
     "budget_vs_actuals_by_afe":         "Budget vs actuals with % consumed per AFE",
     "budget_vs_actuals_by_cost_center": "Budget vs actuals with variance by cost center",
@@ -85,7 +82,8 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         FROM fact_afe_budgets fb
         JOIN dim_cost_center dc ON fb.cost_center_id = dc.id
         JOIN dim_afe da         ON fb.afe_id = da.id
-        WHERE (:year     IS NULL OR YEAR(fb.afe_budget_date) = :year)
+        WHERE fb.approved_copy = 0
+          AND (:year     IS NULL OR YEAR(fb.afe_budget_date) = :year)
           AND (:status   IS NULL OR da.status   = :status)
           AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
         GROUP BY dc.name
@@ -100,7 +98,8 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             SUM(fb.amount)      AS [Budget Amount]
         FROM fact_afe_budgets fb
         JOIN dim_afe da ON fb.afe_id = da.id
-        WHERE (:year       IS NULL OR YEAR(fb.afe_budget_date) = :year)
+        WHERE fb.approved_copy = 0
+          AND (:year       IS NULL OR YEAR(fb.afe_budget_date) = :year)
           AND (:status     IS NULL OR da.status     = :status)
           AND (:afe_type_description   IS NULL OR da.afe_type_description   = :afe_type_description)
           AND (:afe_number IS NULL OR da.number = :afe_number)
@@ -114,7 +113,8 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             SUM(fb.amount)              AS [Budget Amount]
         FROM fact_afe_budgets fb
         JOIN dim_afe da ON fb.afe_id = da.id
-        WHERE (:status   IS NULL OR da.status   = :status)
+        WHERE fb.approved_copy = 0
+          AND (:status   IS NULL OR da.status   = :status)
           AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
         GROUP BY YEAR(fb.afe_budget_date)
         ORDER BY [Year] DESC
@@ -127,7 +127,8 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             SUM(fb.amount)                          AS [Budget Amount]
         FROM fact_afe_budgets fb
         JOIN dim_afe da ON fb.afe_id = da.id
-        WHERE (:year   IS NULL OR YEAR(fb.afe_budget_date) = :year)
+        WHERE fb.approved_copy = 0
+          AND (:year   IS NULL OR YEAR(fb.afe_budget_date) = :year)
           AND (:status IS NULL OR da.status = :status)
         GROUP BY YEAR(fb.afe_budget_date), DATEPART(QUARTER, fb.afe_budget_date)
         ORDER BY [Year] DESC, [Quarter] ASC
@@ -139,7 +140,8 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             COUNT(DISTINCT da.number)   AS [AFE Count]
         FROM fact_afe_budgets fb
         JOIN dim_afe da ON fb.afe_id = da.id
-        WHERE (:year     IS NULL OR YEAR(fb.afe_budget_date) = :year)
+        WHERE fb.approved_copy = 0
+          AND (:year     IS NULL OR YEAR(fb.afe_budget_date) = :year)
           AND (:status   IS NULL OR da.status   = :status)
           AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
     """,
@@ -198,26 +200,14 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         ORDER BY [Year] DESC, [Quarter] ASC
     """,
 
-    "actuals_by_region": """
-        SELECT TOP (:top_n)
-            da.region                           AS [Region],
-            SUM(fa.amount)                      AS [Actual Amount],
-            COUNT(DISTINCT da.number)       AS [AFE Count]
-        FROM fact_afe_actuals fa
-        JOIN dim_afe da ON fa.afe_id = da.id
-        WHERE (:year   IS NULL OR YEAR(fa.accounting_date) = :year)
-          AND (:status IS NULL OR da.status = :status)
-        GROUP BY da.region
-        ORDER BY [Actual Amount] DESC
-    """,
-
     "budget_vs_actuals_by_year": """
         WITH budgets AS (
             SELECT YEAR(fb.afe_budget_date)  AS [Year],
                    SUM(fb.amount)            AS [Budget Amount]
             FROM fact_afe_budgets fb
             JOIN dim_afe da ON fb.afe_id = da.id
-            WHERE (:status   IS NULL OR da.status   = :status)
+            WHERE fb.approved_copy = 0
+              AND (:status   IS NULL OR da.status   = :status)
               AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
             GROUP BY YEAR(fb.afe_budget_date)
         ),
@@ -249,7 +239,8 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
                    SUM(fb.amount)  AS [Budget Amount]
             FROM fact_afe_budgets fb
             JOIN dim_afe da ON fb.afe_id = da.id
-            WHERE (:year     IS NULL OR YEAR(fb.afe_budget_date) = :year)
+            WHERE fb.approved_copy = 0
+              AND (:year     IS NULL OR YEAR(fb.afe_budget_date) = :year)
               AND (:status   IS NULL OR da.status   = :status)
             GROUP BY da.number, da.name, da.status
         ),
@@ -282,7 +273,8 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             FROM fact_afe_budgets fb
             JOIN dim_cost_center dc ON fb.cost_center_id = dc.id
             JOIN dim_afe da         ON fb.afe_id = da.id
-            WHERE (:year   IS NULL OR YEAR(fb.afe_budget_date) = :year)
+            WHERE fb.approved_copy = 0
+              AND (:year   IS NULL OR YEAR(fb.afe_budget_date) = :year)
               AND (:status IS NULL OR da.status = :status)
             GROUP BY dc.name
         ),
@@ -311,16 +303,17 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
 
     "full_picture_by_afe": """
         WITH budgets AS (
-            SELECT da.number, da.name, da.status,
+            SELECT da.number afe_number, da.name, da.status,
                    SUM(fb.amount)           AS [Budget Amount]
             FROM fact_afe_budgets fb
             JOIN dim_afe da ON fb.afe_id = da.id
-            WHERE (:year   IS NULL OR YEAR(fb.afe_budget_date) = :year)
+            WHERE fb.approved_copy = 0
+              AND (:year   IS NULL OR YEAR(fb.afe_budget_date) = :year)
               AND (:status IS NULL OR da.status = :status)
             GROUP BY da.number, da.name, da.status
         ),
         actuals AS (
-            SELECT da.number,
+            SELECT da.number afe_number,
                    SUM(fa.amount)           AS [Actual Amount]
             FROM fact_afe_actuals fa
             JOIN dim_afe da ON fa.afe_id = da.id
@@ -328,11 +321,10 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             GROUP BY da.number
         ),
         commitments AS (
-            SELECT da.number,
-                   SUM(fc.committed_amount) AS [Committed Amount]
+            SELECT da.number afe_number,
+                   SUM(fc.expected_amount) AS [Committed Amount]
             FROM fact_afe_commitments fc
             JOIN dim_afe da ON fc.afe_id = da.id
-            WHERE fc.status != 'Cancelled'
             GROUP BY da.number
         )
         SELECT TOP (:top_n)
@@ -364,7 +356,8 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             FROM fact_afe_budgets fb
             JOIN dim_cost_center dc ON fb.cost_center_id = dc.id
             JOIN dim_afe da         ON fb.afe_id = da.id
-            WHERE (:year   IS NULL OR YEAR(fb.afe_budget_date) = :year)
+            WHERE fb.approved_copy = 0
+              AND (:year   IS NULL OR YEAR(fb.afe_budget_date) = :year)
             GROUP BY dc.name
         ),
         actuals AS (
@@ -389,16 +382,17 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
 
     "consumed_pct_by_afe": """
         WITH budgets AS (
-            SELECT da.number, da.name, da.status,
+            SELECT da.number afe_number, da.name, da.status,
                    SUM(fb.amount) AS [Budget Amount]
             FROM fact_afe_budgets fb
             JOIN dim_afe da ON fb.afe_id = da.id
-            WHERE (:year   IS NULL OR YEAR(fb.afe_budget_date) = :year)
+            WHERE fb.approved_copy = 0
+              AND (:year   IS NULL OR YEAR(fb.afe_budget_date) = :year)
               AND (:status IS NULL OR da.status = :status)
             GROUP BY da.number, da.name, da.status
         ),
         actuals AS (
-            SELECT da.number,
+            SELECT da.number afe_number,
                    SUM(fa.amount) AS [Actual Amount]
             FROM fact_afe_actuals fa
             JOIN dim_afe da ON fa.afe_id = da.id
@@ -420,16 +414,17 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
 
     "remaining_by_afe": """
         WITH budgets AS (
-            SELECT da.number, da.name, da.status,
+            SELECT da.number afe_number, da.name, da.status,
                    SUM(fb.amount) AS [Budget Amount]
             FROM fact_afe_budgets fb
             JOIN dim_afe da ON fb.afe_id = da.id
-            WHERE (:year   IS NULL OR YEAR(fb.afe_budget_date) = :year)
+            WHERE fb.approved_copy = 0
+              AND (:year   IS NULL OR YEAR(fb.afe_budget_date) = :year)
               AND (:status IS NULL OR da.status = :status)
             GROUP BY da.number, da.name, da.status
         ),
         actuals AS (
-            SELECT da.number,
+            SELECT da.number afe_number,
                    SUM(fa.amount) AS [Actual Amount]
             FROM fact_afe_actuals fa
             JOIN dim_afe da ON fa.afe_id = da.id
@@ -437,11 +432,10 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             GROUP BY da.number
         ),
         commitments AS (
-            SELECT da.number,
-                   SUM(fc.committed_amount) AS [Committed Amount]
+            SELECT da.number afe_number,
+                   SUM(fc.expected_amount) AS [Committed Amount]
             FROM fact_afe_commitments fc
             JOIN dim_afe da ON fc.afe_id = da.id
-            WHERE fc.status != 'Cancelled'
             GROUP BY da.number
         )
         SELECT TOP (:top_n)
