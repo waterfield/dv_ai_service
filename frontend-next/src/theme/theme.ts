@@ -1,29 +1,49 @@
-'use client';
 import { createTheme } from '@mui/material/styles';
 
 const theme = createTheme({
   palette: {
-    mode: 'dark',
-    primary: { main: '#0ea5e9' },
-    secondary: { main: '#f59e0b' },
+    mode: 'light',
+    primary: { main: '#f5a623', contrastText: '#ffffff' },   // W Energy orange
+    secondary: { main: '#0d3344', contrastText: '#ffffff' }, // dark teal
+    success: { main: '#22c55e' },
     background: {
-      default: '#0f172a',
-      paper: '#1e293b',
+      default: '#f0f2f5',
+      paper: '#ffffff',
     },
     text: {
-      primary: '#f1f5f9',
-      secondary: '#94a3b8',
+      primary: '#1a2332',
+      secondary: '#6b7280',
     },
+    divider: '#e5e7eb',
   },
   typography: {
     fontFamily: '"Inter", "Roboto", sans-serif',
-    h6: { fontWeight: 600 },
+    h6: { fontWeight: 700 },
+    overline: { letterSpacing: '0.1em', fontWeight: 600 },
   },
-  shape: { borderRadius: 12 },
+  shape: { borderRadius: 8 },
   components: {
     MuiCard: {
       styleOverrides: {
-        root: { backgroundImage: 'none' },
+        root: {
+          backgroundImage: 'none',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+          border: '1px solid #e5e7eb',
+        },
+      },
+    },
+    MuiChip: {
+      styleOverrides: {
+        root: { fontWeight: 600 },
+      },
+    },
+    MuiTab: {
+      styleOverrides: {
+        root: {
+          textTransform: 'none',
+          fontWeight: 600,
+          fontSize: 13,
+        },
       },
     },
   },

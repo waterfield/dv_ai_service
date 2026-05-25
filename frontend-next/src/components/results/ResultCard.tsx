@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Card, CardContent, Tabs, Tab, Box, Typography } from '@mui/material';
+import { Card, CardContent, Tabs, Tab, Box, Typography, Skeleton } from '@mui/material';
 import TableChartIcon from '@mui/icons-material/TableChart';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
@@ -21,12 +21,24 @@ export default function ResultCard({ result, analyzeLoading }: Props) {
   const [tab, setTab] = useState(0);
   const { chat, execute, analyze } = result;
 
-  if (!execute || execute.status === 'error') {
+  if (!execute) {
+    return (
+      <Card sx={{ mt: 1 }}>
+        <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Skeleton variant="rectangular" height={20} width="60%" />
+          <Skeleton variant="rectangular" height={20} width="80%" />
+          <Skeleton variant="rectangular" height={20} width="40%" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (execute.status === 'error') {
     return (
       <Card sx={{ mt: 1 }}>
         <CardContent>
           <Typography variant="body2" color="error">
-            {execute?.error ?? 'Execution failed'}
+            {execute.error ?? 'Execution failed'}
           </Typography>
         </CardContent>
       </Card>

@@ -98,19 +98,44 @@ export default function Home() {
           flexShrink: 0,
           '& .MuiDrawer-paper': {
             width: DRAWER_WIDTH, boxSizing: 'border-box',
-            borderRight: '1px solid', borderColor: 'divider',
+            bgcolor: '#0d3344', color: '#fff',
+            borderRight: 'none',
           },
         }}
       >
-        <Toolbar sx={{ px: 2, gap: 1 }}>
-          <Typography variant="h6" noWrap sx={{ flex: 1, fontSize: 15 }}>
-            W AI Reporting
+        {/* Logo / branding */}
+        <Box sx={{ px: 2, py: 2, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box
+            sx={{
+              width: 36, height: 36, borderRadius: '50%',
+              bgcolor: '#f5a623',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontWeight: 900, fontSize: 18, color: '#fff', flexShrink: 0,
+            }}
+          >
+            W
+          </Box>
+          <Typography variant="h6" noWrap sx={{ fontSize: 15, color: '#fff', lineHeight: 1.2 }}>
+            W ChatSQL
           </Typography>
+        </Box>
+
+        {/* Connection status */}
+        <Box sx={{ px: 2, pb: 1.5 }}>
           <ConnectionStatus />
-        </Toolbar>
-        <Divider />
-        <Box sx={{ overflow: 'auto', py: 1 }}>
+        </Box>
+
+        <Divider sx={{ borderColor: 'rgba(255,255,255,0.12)' }} />
+
+        <Box sx={{ overflow: 'auto', py: 1, flex: 1 }}>
           <ExampleQuestions onSelect={handleQuery} disabled={loading} />
+        </Box>
+
+        {/* Footer */}
+        <Box sx={{ px: 2, py: 1.5, borderTop: '1px solid rgba(255,255,255,0.12)' }}>
+          <Typography variant="caption" sx={{ color: '#f5a623', fontWeight: 600, fontSize: 10 }}>
+            Powered by Wenergy AI
+          </Typography>
         </Box>
       </Drawer>
 
@@ -118,12 +143,34 @@ export default function Home() {
         <AppBar
           position="static"
           elevation={0}
-          sx={{ bgcolor: 'background.paper', borderBottom: '1px solid', borderColor: 'divider' }}
+          sx={{ bgcolor: '#0d3344', borderBottom: 'none' }}
         >
-          <Toolbar>
-            <Typography variant="subtitle1" sx={{ color: 'text.primary' }}>
+          <Toolbar sx={{ gap: 1.5 }}>
+            <Box
+              sx={{
+                width: 30, height: 30, borderRadius: '50%',
+                bgcolor: '#f5a623',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 900, fontSize: 15, color: '#fff', flexShrink: 0,
+              }}
+            >
+              W
+            </Box>
+            <Typography variant="subtitle1" sx={{ color: '#fff', fontWeight: 600 }}>
               AFE Analytics Chat
             </Typography>
+            <Box
+              sx={{
+                ml: 1, px: 1, py: 0.25,
+                bgcolor: 'rgba(245,166,35,0.2)',
+                border: '1px solid rgba(245,166,35,0.4)',
+                borderRadius: 1,
+              }}
+            >
+              <Typography variant="caption" sx={{ color: '#f5a623', fontSize: 10, fontWeight: 600 }}>
+                Read-only
+              </Typography>
+            </Box>
           </Toolbar>
         </AppBar>
 

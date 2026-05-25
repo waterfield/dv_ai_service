@@ -38,7 +38,7 @@ export default function ChatInput({ onSend, disabled, loading }: Props) {
         fullWidth
         multiline
         maxRows={4}
-        placeholder="Ask a question about AFE data..."
+        placeholder="Ask a question about your data..."
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={onKeyDown}

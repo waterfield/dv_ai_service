@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Chip } from '@mui/material';
+import { Box, Typography } from '@mui/material';
+import CircleIcon from '@mui/icons-material/Circle';
 import { apiHealth } from '@/lib/api';
 
 export default function ConnectionStatus() {
@@ -15,12 +16,17 @@ export default function ConnectionStatus() {
   if (connected === null) return null;
 
   return (
-    <Chip
-      size="small"
-      label={connected ? 'DB Connected' : 'DB Offline'}
-      color={connected ? 'success' : 'error'}
-      variant="outlined"
-      sx={{ fontSize: 11 }}
-    />
+    <Box
+      sx={{
+        display: 'flex', alignItems: 'center', gap: 0.75, px: 1.5, py: 0.5,
+        bgcolor: connected ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+        borderRadius: 2,
+      }}
+    >
+      <CircleIcon sx={{ fontSize: 8, color: connected ? '#22c55e' : '#ef4444' }} />
+      <Typography variant="caption" sx={{ color: connected ? '#22c55e' : '#ef4444', fontWeight: 600, fontSize: 11 }}>
+        {connected ? 'Connected to database' : 'Database offline'}
+      </Typography>
+    </Box>
   );
 }
