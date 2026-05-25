@@ -5,6 +5,7 @@ from typing import Optional, Any, Literal
 class ChatRequest(BaseModel):
     user_query: str
     session_id: Optional[str] = None
+    history: list[dict] = []
 
 
 class ExecuteRequest(BaseModel):

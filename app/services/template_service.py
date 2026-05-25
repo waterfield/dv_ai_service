@@ -20,13 +20,13 @@ class TemplateService:
     def __init__(self, llm: LLMService):
         self.llm = llm
 
-    def resolve(self, user_query: str) -> tuple[str, dict, str, str, str]:
+    def resolve(self, user_query: str, history: list[dict] = []) -> tuple[str, dict, str, str, str]:
         """Resolve a user question to a pre-written SQL template + bind params.
 
         Returns: (sql_string, params_dict, template_key, reasoning_string, tool_name)
         Raises: ValueError if no template matches, InvalidParamsError if params are invalid.
         """
-        tool_name, tool_args = self.llm.generate_with_tools(user_query, ALL_TOOLS)
+        tool_name, tool_args = self.llm.generate_with_tools(user_query, ALL_TOOLS, history=history)
 
         if tool_name == "unknown_query":
             raise ValueError("Question not covered by any available template")

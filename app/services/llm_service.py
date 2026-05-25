@@ -126,13 +126,14 @@ class LLMService:
         self,
         user_query: str,
         tools: list[dict],
+        history: list[dict] = [],
     ) -> tuple[str, dict]:
         """Call LLM with tool definitions. Returns (tool_name, tool_args_dict).
 
         tools must be in OpenAI function-calling format:
           [{"type": "function", "function": {"name": ..., "description": ..., "parameters": {...}}}]
 
-        Anthropic format is derived internally.
+        Anthropic format is derived internally. history is a list of prior messages.
         Raises RuntimeError if all models fail or no tool call is returned.
         """
         last_error = None
@@ -149,11 +150,12 @@ class LLMService:
                         }
                         for t in tools
                     ]
+                    messages = [*history, {"role": "user", "content": user_query}]
                     resp = client.messages.create(
                         model=model,
                         max_tokens=512,
                         temperature=0.0,
-                        messages=[{"role": "user", "content": user_query}],
+                        messages=messages,
                         tools=anthropic_tools,
                         tool_choice={"type": "any"},
                     )
@@ -164,9 +166,10 @@ class LLMService:
                     raise ValueError("Anthropic did not return a tool use block")
 
                 # OpenAI-compatible (groq, openrouter)
+                messages = [*history, {"role": "user", "content": user_query}]
                 kwargs: dict = dict(
                     model=model,
-                    messages=[{"role": "user", "content": user_query}],
+                    messages=messages,
                     tools=tools,
                     tool_choice="required",
                     max_tokens=512,
