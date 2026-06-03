@@ -12,16 +12,22 @@ class AFEFinancialRequest(BaseModel):
     template guide:
       budget_by_cost_center             -> budget breakdown by department
       budget_by_afe                     -> budget per individual AFE
+      budget_by_afe_type                -> budget grouped by AFE type
+      budget_by_project                 -> budget grouped by project
       budget_by_year                    -> budget trend over years
       budget_by_quarter                 -> budget trend by quarter
       budget_total                      -> single grand total
       actuals_by_cost_center            -> actual spend by department
       actuals_by_afe                    -> actual spend per AFE
+      actuals_by_afe_type               -> actual spend grouped by AFE type
+      actuals_by_project                -> actual spend grouped by project
       actuals_by_year                   -> actual spend trend by year
       actuals_by_quarter                -> actual spend trend by quarter
       budget_vs_actuals_by_year         -> budget vs actuals comparison with variance by year
       budget_vs_actuals_by_afe          -> budget vs actuals comparison per AFE
       budget_vs_actuals_by_cost_center  -> budget vs actuals comparison by department
+      budget_vs_actuals_by_afe_type     -> budget vs actuals comparison by AFE type
+      budget_vs_actuals_by_project      -> budget vs actuals comparison by project
       full_picture_by_afe               -> budget + actuals + commitments + remaining per AFE
       consumed_pct_by_cost_center       -> % budget spent by department
       consumed_pct_by_afe               -> % budget spent per AFE
@@ -31,16 +37,22 @@ class AFEFinancialRequest(BaseModel):
     template: Literal[
         "budget_by_cost_center",
         "budget_by_afe",
+        "budget_by_afe_type",
+        "budget_by_project",
         "budget_by_year",
         "budget_by_quarter",
         "budget_total",
         "actuals_by_cost_center",
         "actuals_by_afe",
+        "actuals_by_afe_type",
+        "actuals_by_project",
         "actuals_by_year",
         "actuals_by_quarter",
         "budget_vs_actuals_by_year",
         "budget_vs_actuals_by_afe",
         "budget_vs_actuals_by_cost_center",
+        "budget_vs_actuals_by_afe_type",
+        "budget_vs_actuals_by_project",
         "full_picture_by_afe",
         "consumed_pct_by_cost_center",
         "consumed_pct_by_afe",
@@ -57,16 +69,22 @@ class AFEFinancialRequest(BaseModel):
 TEMPLATE_DESCRIPTIONS: dict[str, str] = {
     "budget_by_cost_center":            "Budget breakdown by cost center",
     "budget_by_afe":                    "Budget per individual AFE",
+    "budget_by_afe_type":               "Budget grouped by AFE type",
+    "budget_by_project":                "Budget grouped by project",
     "budget_by_year":                   "Budget trend over years",
     "budget_by_quarter":                "Budget trend by quarter",
     "budget_total":                     "Grand total budget amount and AFE count",
     "actuals_by_cost_center":           "Actual spend by cost center",
     "actuals_by_afe":                   "Actual spend per AFE",
+    "actuals_by_afe_type":              "Actual spend grouped by AFE type",
+    "actuals_by_project":               "Actual spend grouped by project",
     "actuals_by_year":                  "Actual spend trend by year",
     "actuals_by_quarter":               "Actual spend trend by quarter",
     "budget_vs_actuals_by_year":        "Budget vs actuals with variance by year",
     "budget_vs_actuals_by_afe":         "Budget vs actuals with % consumed per AFE",
     "budget_vs_actuals_by_cost_center": "Budget vs actuals with variance by cost center",
+    "budget_vs_actuals_by_afe_type":    "Budget vs actuals with variance by AFE type",
+    "budget_vs_actuals_by_project":     "Budget vs actuals with variance by project",
     "full_picture_by_afe":              "Full picture: budget, actuals, commitments, and remaining per AFE",
     "consumed_pct_by_cost_center":      "% of budget consumed by cost center",
     "consumed_pct_by_afe":              "% of budget consumed per AFE",
@@ -104,6 +122,35 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
           AND (:afe_type_description   IS NULL OR da.afe_type_description   = :afe_type_description)
           AND (:afe_number IS NULL OR da.number = :afe_number)
         GROUP BY da.number, da.name, da.status
+        ORDER BY [Budget Amount] DESC
+    """,
+
+    "budget_by_afe_type": """
+        SELECT TOP (:top_n)
+            da.afe_type_description     AS [AFE Type],
+            SUM(fb.amount)              AS [Budget Amount],
+            COUNT(DISTINCT da.number)   AS [AFE Count]
+        FROM fact_afe_budgets fb
+        JOIN dim_afe da ON fb.afe_id = da.id
+        WHERE fb.approved_copy = 0
+          AND (:year   IS NULL OR YEAR(fb.afe_budget_date) = :year)
+          AND (:status IS NULL OR da.status = :status)
+        GROUP BY da.afe_type_description
+        ORDER BY [Budget Amount] DESC
+    """,
+
+    "budget_by_project": """
+        SELECT TOP (:top_n)
+            da.afe_project_name         AS [Project],
+            SUM(fb.amount)              AS [Budget Amount],
+            COUNT(DISTINCT da.number)   AS [AFE Count]
+        FROM fact_afe_budgets fb
+        JOIN dim_afe da ON fb.afe_id = da.id
+        WHERE fb.approved_copy = 0
+          AND (:year             IS NULL OR YEAR(fb.afe_budget_date) = :year)
+          AND (:status           IS NULL OR da.status = :status)
+          AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+        GROUP BY da.afe_project_name
         ORDER BY [Budget Amount] DESC
     """,
 
@@ -172,6 +219,33 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
           AND (:status     IS NULL OR da.status     = :status)
           AND (:afe_number IS NULL OR da.number = :afe_number)
         GROUP BY da.number, da.name, da.status
+        ORDER BY [Actual Amount] DESC
+    """,
+
+    "actuals_by_afe_type": """
+        SELECT TOP (:top_n)
+            da.afe_type_description     AS [AFE Type],
+            SUM(fa.amount)              AS [Actual Amount],
+            COUNT(DISTINCT da.number)   AS [AFE Count]
+        FROM fact_afe_actuals fa
+        JOIN dim_afe da ON fa.afe_id = da.id
+        WHERE (:year   IS NULL OR YEAR(fa.accounting_date) = :year)
+          AND (:status IS NULL OR da.status = :status)
+        GROUP BY da.afe_type_description
+        ORDER BY [Actual Amount] DESC
+    """,
+
+    "actuals_by_project": """
+        SELECT TOP (:top_n)
+            da.afe_project_name         AS [Project],
+            SUM(fa.amount)              AS [Actual Amount],
+            COUNT(DISTINCT da.number)   AS [AFE Count]
+        FROM fact_afe_actuals fa
+        JOIN dim_afe da ON fa.afe_id = da.id
+        WHERE (:year             IS NULL OR YEAR(fa.accounting_date) = :year)
+          AND (:status           IS NULL OR da.status = :status)
+          AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+        GROUP BY da.afe_project_name
         ORDER BY [Actual Amount] DESC
     """,
 
@@ -299,6 +373,74 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         FROM budgets b
         FULL OUTER JOIN actuals a ON b.[Cost Center] = a.[Cost Center]
         ORDER BY [Variance %] DESC
+    """,
+
+    "budget_vs_actuals_by_afe_type": """
+        WITH budgets AS (
+            SELECT da.afe_type_description      AS [AFE Type],
+                   SUM(fb.amount)               AS [Budget Amount]
+            FROM fact_afe_budgets fb
+            JOIN dim_afe da ON fb.afe_id = da.id
+            WHERE fb.approved_copy = 0
+              AND (:year   IS NULL OR YEAR(fb.afe_budget_date) = :year)
+              AND (:status IS NULL OR da.status = :status)
+            GROUP BY da.afe_type_description
+        ),
+        actuals AS (
+            SELECT da.afe_type_description      AS [AFE Type],
+                   SUM(fa.amount)               AS [Actual Amount]
+            FROM fact_afe_actuals fa
+            JOIN dim_afe da ON fa.afe_id = da.id
+            WHERE (:year   IS NULL OR YEAR(fa.accounting_date) = :year)
+              AND (:status IS NULL OR da.status = :status)
+            GROUP BY da.afe_type_description
+        )
+        SELECT TOP (:top_n)
+            COALESCE(b.[AFE Type], a.[AFE Type])                                  AS [AFE Type],
+            COALESCE(b.[Budget Amount], 0)                                        AS [Budget Amount],
+            COALESCE(a.[Actual Amount], 0)                                        AS [Actual Amount],
+            COALESCE(a.[Actual Amount], 0) - COALESCE(b.[Budget Amount], 0)       AS [Variance],
+            IIF(COALESCE(b.[Budget Amount], 0) > 0,
+                (COALESCE(a.[Actual Amount], 0) - COALESCE(b.[Budget Amount], 0))
+                * 100.0 / b.[Budget Amount], 0)                                   AS [Variance %]
+        FROM budgets b
+        FULL OUTER JOIN actuals a ON b.[AFE Type] = a.[AFE Type]
+        ORDER BY [Budget Amount] DESC
+    """,
+
+    "budget_vs_actuals_by_project": """
+        WITH budgets AS (
+            SELECT da.afe_project_name          AS [Project],
+                   SUM(fb.amount)               AS [Budget Amount]
+            FROM fact_afe_budgets fb
+            JOIN dim_afe da ON fb.afe_id = da.id
+            WHERE fb.approved_copy = 0
+              AND (:year             IS NULL OR YEAR(fb.afe_budget_date) = :year)
+              AND (:status           IS NULL OR da.status = :status)
+              AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+            GROUP BY da.afe_project_name
+        ),
+        actuals AS (
+            SELECT da.afe_project_name          AS [Project],
+                   SUM(fa.amount)               AS [Actual Amount]
+            FROM fact_afe_actuals fa
+            JOIN dim_afe da ON fa.afe_id = da.id
+            WHERE (:year             IS NULL OR YEAR(fa.accounting_date) = :year)
+              AND (:status           IS NULL OR da.status = :status)
+              AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+            GROUP BY da.afe_project_name
+        )
+        SELECT TOP (:top_n)
+            COALESCE(b.[Project], a.[Project])                                    AS [Project],
+            COALESCE(b.[Budget Amount], 0)                                        AS [Budget Amount],
+            COALESCE(a.[Actual Amount], 0)                                        AS [Actual Amount],
+            COALESCE(a.[Actual Amount], 0) - COALESCE(b.[Budget Amount], 0)       AS [Variance],
+            IIF(COALESCE(b.[Budget Amount], 0) > 0,
+                (COALESCE(a.[Actual Amount], 0) - COALESCE(b.[Budget Amount], 0))
+                * 100.0 / b.[Budget Amount], 0)                                   AS [Variance %]
+        FROM budgets b
+        FULL OUTER JOIN actuals a ON b.[Project] = a.[Project]
+        ORDER BY [Budget Amount] DESC
     """,
 
     "full_picture_by_afe": """
