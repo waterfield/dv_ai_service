@@ -9,25 +9,31 @@ class AFEFinancialRequest(BaseModel):
     Use for ANY question about AFE money, spend, costs, variance, remaining budget,
     or % consumed. Do NOT use for AFE master data / attribute lists.
 
+    IMPORTANT — unsupported granularities: weekly and daily breakdowns are NOT available.
+    If the user asks for a specific week or day — use unknown_query.
+
     template guide:
       budget_by_cost_center             -> budget breakdown by department
       budget_by_afe                     -> budget per individual AFE
-      budget_by_afe_type                -> budget grouped by AFE type
-      budget_by_project                 -> budget grouped by project
+      budget_by_afe_type                -> budget grouped by AFE type (e.g. "Drill & Complete", "Facility") — use when user says "by type" or "by AFE type"
+      budget_by_project                 -> budget grouped by project name — use when user says "by project" or "by project type"
       budget_by_year                    -> budget trend over years
+      budget_by_month                   -> budget trend by year and month
       budget_by_quarter                 -> budget trend by quarter
       budget_total                      -> single grand total
       actuals_by_cost_center            -> actual spend by department
       actuals_by_afe                    -> actual spend per AFE
-      actuals_by_afe_type               -> actual spend grouped by AFE type
-      actuals_by_project                -> actual spend grouped by project
+      actuals_by_afe_type               -> actual spend grouped by AFE type (e.g. "Drill & Complete", "Facility") — use when user says "by type" or "by AFE type"
+      actuals_by_project                -> actual spend grouped by project name — use when user says "by project" or "by project type"
       actuals_by_year                   -> actual spend trend by year
+      actuals_by_month                  -> actual spend trend by year and month
       actuals_by_quarter                -> actual spend trend by quarter
       budget_vs_actuals_by_year         -> budget vs actuals comparison with variance by year
+      budget_vs_actuals_by_month        -> budget vs actuals comparison by year and month
       budget_vs_actuals_by_afe          -> budget vs actuals comparison per AFE
       budget_vs_actuals_by_cost_center  -> budget vs actuals comparison by department
-      budget_vs_actuals_by_afe_type     -> budget vs actuals comparison by AFE type
-      budget_vs_actuals_by_project      -> budget vs actuals comparison by project
+      budget_vs_actuals_by_afe_type     -> budget vs actuals comparison by AFE type (e.g. "Drill & Complete", "Facility") — use when user says "by type" or "by AFE type"
+      budget_vs_actuals_by_project      -> budget vs actuals comparison by project name — use when user says "by project" or "by project type"
       full_picture_by_afe               -> budget + actuals + commitments + remaining per AFE
       consumed_pct_by_cost_center       -> % budget spent by department
       consumed_pct_by_afe               -> % budget spent per AFE
@@ -40,6 +46,7 @@ class AFEFinancialRequest(BaseModel):
         "budget_by_afe_type",
         "budget_by_project",
         "budget_by_year",
+        "budget_by_month",
         "budget_by_quarter",
         "budget_total",
         "actuals_by_cost_center",
@@ -47,8 +54,10 @@ class AFEFinancialRequest(BaseModel):
         "actuals_by_afe_type",
         "actuals_by_project",
         "actuals_by_year",
+        "actuals_by_month",
         "actuals_by_quarter",
         "budget_vs_actuals_by_year",
+        "budget_vs_actuals_by_month",
         "budget_vs_actuals_by_afe",
         "budget_vs_actuals_by_cost_center",
         "budget_vs_actuals_by_afe_type",
@@ -60,6 +69,7 @@ class AFEFinancialRequest(BaseModel):
     ]
 
     year:       int | None = Field(None, ge=2000, le=2030, description="Budget/actuals year")
+    month:      int | None = Field(None, ge=1,    le=12,   description="Month number 1-12; use with budget_by_month / actuals_by_month / budget_vs_actuals_by_month")
     status:     Literal["Open", "Completed", "Rejected"] | None = None
     afe_type_description:   Literal["Expense Workover", "Plug & Abandonment", "Recompletion", "Reclamation", "Stake & Permit", "Facility", "Land/Acquisition", "Nonop Drill & Complete", "Environmental", "Lease and Well Equipment", "Other", "Geological & Geospatial", "Drill & Complete", "Internal"] | None = None
     afe_number: str | None = Field(None, description="Specific AFE identifier e.g. AFE-2025-001")
@@ -72,6 +82,7 @@ TEMPLATE_DESCRIPTIONS: dict[str, str] = {
     "budget_by_afe_type":               "Budget grouped by AFE type",
     "budget_by_project":                "Budget grouped by project",
     "budget_by_year":                   "Budget trend over years",
+    "budget_by_month":                  "Budget trend by year and month",
     "budget_by_quarter":                "Budget trend by quarter",
     "budget_total":                     "Grand total budget amount and AFE count",
     "actuals_by_cost_center":           "Actual spend by cost center",
@@ -79,8 +90,10 @@ TEMPLATE_DESCRIPTIONS: dict[str, str] = {
     "actuals_by_afe_type":              "Actual spend grouped by AFE type",
     "actuals_by_project":               "Actual spend grouped by project",
     "actuals_by_year":                  "Actual spend trend by year",
+    "actuals_by_month":                 "Actual spend trend by year and month",
     "actuals_by_quarter":               "Actual spend trend by quarter",
     "budget_vs_actuals_by_year":        "Budget vs actuals with variance by year",
+    "budget_vs_actuals_by_month":       "Budget vs actuals with variance by year and month",
     "budget_vs_actuals_by_afe":         "Budget vs actuals with % consumed per AFE",
     "budget_vs_actuals_by_cost_center": "Budget vs actuals with variance by cost center",
     "budget_vs_actuals_by_afe_type":    "Budget vs actuals with variance by AFE type",
@@ -165,6 +178,22 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
           AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
         GROUP BY YEAR(fb.afe_budget_date)
         ORDER BY [Year] DESC
+    """,
+
+    "budget_by_month": """
+        SELECT TOP (:top_n)
+            YEAR(fb.afe_budget_date)    AS [Year],
+            MONTH(fb.afe_budget_date)   AS [Month],
+            SUM(fb.amount)              AS [Budget Amount]
+        FROM fact_afe_budgets fb
+        JOIN dim_afe da ON fb.afe_id = da.id
+        WHERE fb.approved_copy = 0
+          AND (:year   IS NULL OR YEAR(fb.afe_budget_date)  = :year)
+          AND (:month  IS NULL OR MONTH(fb.afe_budget_date) = :month)
+          AND (:status IS NULL OR da.status = :status)
+          AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+        GROUP BY YEAR(fb.afe_budget_date), MONTH(fb.afe_budget_date)
+        ORDER BY [Year] DESC, [Month] ASC
     """,
 
     "budget_by_quarter": """
@@ -261,6 +290,21 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         ORDER BY [Year] DESC
     """,
 
+    "actuals_by_month": """
+        SELECT TOP (:top_n)
+            YEAR(fa.accounting_date)    AS [Year],
+            MONTH(fa.accounting_date)   AS [Month],
+            SUM(fa.amount)              AS [Actual Amount]
+        FROM fact_afe_actuals fa
+        JOIN dim_afe da ON fa.afe_id = da.id
+        WHERE (:year   IS NULL OR YEAR(fa.accounting_date)  = :year)
+          AND (:month  IS NULL OR MONTH(fa.accounting_date) = :month)
+          AND (:status IS NULL OR da.status = :status)
+          AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+        GROUP BY YEAR(fa.accounting_date), MONTH(fa.accounting_date)
+        ORDER BY [Year] DESC, [Month] ASC
+    """,
+
     "actuals_by_quarter": """
         SELECT TOP (:top_n)
             YEAR(fa.accounting_date)                AS [Year],
@@ -305,6 +349,46 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         FROM budgets b
         FULL OUTER JOIN actuals a ON b.[Year] = a.[Year]
         ORDER BY [Year] DESC
+    """,
+
+    "budget_vs_actuals_by_month": """
+        WITH budgets AS (
+            SELECT YEAR(fb.afe_budget_date)   AS [Year],
+                   MONTH(fb.afe_budget_date)  AS [Month],
+                   SUM(fb.amount)             AS [Budget Amount]
+            FROM fact_afe_budgets fb
+            JOIN dim_afe da ON fb.afe_id = da.id
+            WHERE fb.approved_copy = 0
+              AND (:year   IS NULL OR YEAR(fb.afe_budget_date)  = :year)
+              AND (:month  IS NULL OR MONTH(fb.afe_budget_date) = :month)
+              AND (:status IS NULL OR da.status = :status)
+              AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+            GROUP BY YEAR(fb.afe_budget_date), MONTH(fb.afe_budget_date)
+        ),
+        actuals AS (
+            SELECT YEAR(fa.accounting_date)   AS [Year],
+                   MONTH(fa.accounting_date)  AS [Month],
+                   SUM(fa.amount)             AS [Actual Amount]
+            FROM fact_afe_actuals fa
+            JOIN dim_afe da ON fa.afe_id = da.id
+            WHERE (:year   IS NULL OR YEAR(fa.accounting_date)  = :year)
+              AND (:month  IS NULL OR MONTH(fa.accounting_date) = :month)
+              AND (:status IS NULL OR da.status = :status)
+              AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+            GROUP BY YEAR(fa.accounting_date), MONTH(fa.accounting_date)
+        )
+        SELECT TOP (:top_n)
+            COALESCE(b.[Year],  a.[Year])                                         AS [Year],
+            COALESCE(b.[Month], a.[Month])                                        AS [Month],
+            COALESCE(b.[Budget Amount], 0)                                        AS [Budget Amount],
+            COALESCE(a.[Actual Amount], 0)                                        AS [Actual Amount],
+            COALESCE(a.[Actual Amount], 0) - COALESCE(b.[Budget Amount], 0)       AS [Variance],
+            IIF(COALESCE(b.[Budget Amount], 0) > 0,
+                (COALESCE(a.[Actual Amount], 0) - COALESCE(b.[Budget Amount], 0))
+                * 100.0 / b.[Budget Amount], 0)                                   AS [Variance %]
+        FROM budgets b
+        FULL OUTER JOIN actuals a ON b.[Year] = a.[Year] AND b.[Month] = a.[Month]
+        ORDER BY [Year] DESC, [Month] ASC
     """,
 
     "budget_vs_actuals_by_afe": """
@@ -607,11 +691,12 @@ def resolve_afe_financial(tool_args: dict) -> tuple[str, dict, str]:
     request = AFEFinancialRequest(**tool_args)
     sql = AFE_FINANCIAL_TEMPLATES[request.template]
     params = {
-        "year":       request.year,
-        "status":     request.status,
-        "afe_type_description":   request.afe_type_description,
-        "afe_number": request.afe_number,
-        "top_n":      request.top_n,
+        "year":                 request.year,
+        "month":                request.month,
+        "status":               request.status,
+        "afe_type_description": request.afe_type_description,
+        "afe_number":           request.afe_number,
+        "top_n":                request.top_n,
     }
     reasoning = TEMPLATE_DESCRIPTIONS.get(request.template, request.template)
     return sql, params, reasoning

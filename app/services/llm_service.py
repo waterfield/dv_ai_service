@@ -127,6 +127,7 @@ class LLMService:
         user_query: str,
         tools: list[dict],
         history: list[dict] = [],
+        system_message: Optional[str] = None,
     ) -> tuple[str, dict]:
         """Call LLM with tool definitions. Returns (tool_name, tool_args_dict).
 
@@ -151,7 +152,7 @@ class LLMService:
                         for t in tools
                     ]
                     messages = [*history, {"role": "user", "content": user_query}]
-                    resp = client.messages.create(
+                    kwargs: dict = dict(
                         model=model,
                         max_tokens=512,
                         temperature=0.0,
@@ -159,6 +160,9 @@ class LLMService:
                         tools=anthropic_tools,
                         tool_choice={"type": "any"},
                     )
+                    if system_message:
+                        kwargs["system"] = system_message
+                    resp = client.messages.create(**kwargs)
                     for block in resp.content:
                         if block.type == "tool_use":
                             logger.info(f"Tool selected: {block.name} args={block.input}")
@@ -166,7 +170,10 @@ class LLMService:
                     raise ValueError("Anthropic did not return a tool use block")
 
                 # OpenAI-compatible (groq, openrouter)
-                messages = [*history, {"role": "user", "content": user_query}]
+                messages = []
+                if system_message:
+                    messages.append({"role": "system", "content": system_message})
+                messages.extend([*history, {"role": "user", "content": user_query}])
                 kwargs: dict = dict(
                     model=model,
                     messages=messages,

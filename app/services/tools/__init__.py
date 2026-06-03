@@ -5,7 +5,14 @@ UNKNOWN_QUERY_TOOL = {
     "type": "function",
     "function": {
         "name": "unknown_query",
-        "description": "Use this ONLY when the question cannot be answered by any available data template. Do not use this if there is any template that could be relevant.",
+        "description": (
+            "Use this ONLY when the question is completely unrelated to AFE financial data "
+            "(budgets, actuals, commitments, spend, variance) AND completely unrelated to AFE "
+            "master data (attributes, lists, status, timelines, approvals). "
+            "If the question is about AFEs, money, projects, or operational data — even loosely — "
+            "pick the closest matching template from afe_financial or afe_master instead. "
+            "NEVER use this tool just because the question does not match a template name exactly."
+        ),
         "parameters": {"type": "object", "properties": {}},
     },
 }

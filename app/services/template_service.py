@@ -42,12 +42,19 @@ class TemplateService:
                 sql, params, reasoning = resolver(tool_args)
             except ValidationError as e:
                 template = tool_args.get("template", "unknown")
-                field_errors = []
+                template_errors = []
+                param_errors = []
                 for err in e.errors():
                     field = ".".join(str(x) for x in err["loc"]) if err["loc"] else "unknown"
                     received = err.get("input")
-                    field_errors.append(f"{field}: {err['msg']} (received: {received!r})")
-                raise InvalidParamsError(tool_name, template, field_errors)
+                    msg = f"{field}: {err['msg']} (received: {received!r})"
+                    if field == "template":
+                        template_errors.append(msg)
+                    else:
+                        param_errors.append(msg)
+                if template_errors:
+                    raise ValueError(f"No template matched for {tool_name!r}: {'; '.join(template_errors)}")
+                raise InvalidParamsError(tool_name, template, param_errors)
             return sql, params, tool_args.get("template", tool_name), reasoning, tool_name
 
         raise ValueError(f"Unknown tool returned by LLM: {tool_name!r}")
