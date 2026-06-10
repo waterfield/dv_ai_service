@@ -1,8 +1,10 @@
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
+from config import MCP_API_KEYS
 from database import test_connection
 from app.api.routes import router
 from app.mcp import mcp
@@ -45,6 +47,15 @@ app.add_middleware(
 
 app.include_router(router, prefix="/api", tags=["api"])
 app.mount("/mcp", _mcp_http)
+
+
+@app.middleware("http")
+async def mcp_auth(request: Request, call_next):
+    if request.url.path.startswith("/mcp") and MCP_API_KEYS:
+        key = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+        if key not in MCP_API_KEYS:
+            return JSONResponse(status_code=401, content={"error": "Invalid or missing API key"})
+    return await call_next(request)
 
 
 @app.get("/")

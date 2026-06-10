@@ -26,6 +26,15 @@ ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
 GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
 OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
 ENABLE_DAX: bool = os.getenv("ENABLE_DAX", "false").lower() == "true"
+
+# MCP API keys — comma-separated list of valid bearer tokens
+# Empty = MCP auth disabled (dev/local use)
+_raw_mcp_keys = os.getenv("MCP_API_KEYS", "")
+MCP_API_KEYS: set[str] = (
+    {k.strip() for k in _raw_mcp_keys.split(",") if k.strip()}
+    if _raw_mcp_keys.strip()
+    else set()
+)
 SHOW_TEMPLATE_DESCRIPTION: bool = os.getenv("SHOW_TEMPLATE_DESCRIPTION", "false").lower() == "true"
 ENABLE_ANALYSIS: bool = os.getenv("ENABLE_ANALYSIS", "true").lower() == "true"
 
