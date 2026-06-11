@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from typing import Literal, Optional
 from pydantic import ValidationError
 
 from database import get_db
@@ -11,6 +12,47 @@ from app.services.tools.afe_master import (
     resolve_afe_master,
     TEMPLATE_DESCRIPTIONS as MASTER_DESCRIPTIONS,
 )
+
+FinancialTemplate = Literal[
+    "budget_by_cost_center",
+    "budget_by_afe",
+    "budget_by_afe_type",
+    "budget_by_project",
+    "budget_by_year",
+    "budget_by_month",
+    "budget_by_quarter",
+    "budget_total",
+    "actuals_by_cost_center",
+    "actuals_by_afe",
+    "actuals_by_afe_type",
+    "actuals_by_project",
+    "actuals_by_year",
+    "actuals_by_month",
+    "actuals_by_quarter",
+    "budget_vs_actuals_by_year",
+    "budget_vs_actuals_by_month",
+    "budget_vs_actuals_by_afe",
+    "budget_vs_actuals_by_cost_center",
+    "budget_vs_actuals_by_afe_type",
+    "budget_vs_actuals_by_project",
+    "full_picture_by_afe",
+    "consumed_pct_by_cost_center",
+    "consumed_pct_by_afe",
+    "remaining_by_afe",
+]
+
+MasterTemplate = Literal[
+    "list_afes",
+    "afe_detail",
+    "afes_by_type",
+    "afes_by_project",
+    "afes_by_company",
+    "afes_by_cost_center",
+    "overdue_afes",
+    "rejected_afes",
+    "upcoming_completions",
+    "recently_approved",
+]
 
 
 @contextmanager
@@ -38,11 +80,11 @@ def _run_query(sql: str, params: dict) -> str:
         "% consumed, and remaining budget. Use for ANY question about AFE money or spend. "
         "Do NOT use for AFE master data (attributes, timelines, approvals) — use "
         "query_afe_master instead. For a COMPLETE AFE summary, always pair with "
-        "query_afe_master. Call get_templates first if unsure which template to use."
+        "query_afe_master. Template values are enumerated in the schema."
     )
 )
 def query_afe_financial(
-    template: str,
+    template: FinancialTemplate,
     afe_number: str | None = None,
     year: int | None = None,
     status: str | None = None,
@@ -79,11 +121,11 @@ def query_afe_financial(
         "timelines, approvals, and rejections. Use for ANY question about AFE properties "
         "or metadata. Do NOT use for budget/actuals/spend — use query_afe_financial instead. "
         "For a COMPLETE AFE summary, always pair with query_afe_financial. "
-        "Call get_templates first if unsure which template to use."
+        "Template values are enumerated in the schema."
     )
 )
 def query_afe_master(
-    template: str,
+    template: MasterTemplate,
     afe_number: str | None = None,
     year: int | None = None,
     status: str | None = None,
@@ -141,3 +183,24 @@ def get_templates(tool_name: str | None = None) -> str:
         for key, desc in MASTER_DESCRIPTIONS.items():
             lines.append(f"- {key}: {desc}")
     return "\n".join(lines)
+
+
+@mcp.tool(
+    description=(
+        "Call this when the user's question cannot be answered by any available template "
+        "in query_afe_financial or query_afe_master. Logs the unsupported query so it can "
+        "be reviewed and a new template added. Do NOT call this if a template exists — "
+        "only use as a last resort."
+    )
+)
+def unknown_query(description: str) -> str:
+    """
+    description: plain English description of what the user asked for that couldn't be answered.
+    """
+    import logging
+    logging.getLogger(__name__).warning(f"UNSUPPORTED_QUERY: {description}")
+    return (
+        f"No template available for: '{description}'. "
+        "This request has been logged for review. "
+        "A new template may be added in a future update."
+    )
