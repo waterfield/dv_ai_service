@@ -35,6 +35,21 @@ MCP_API_KEYS: set[str] = (
     if _raw_mcp_keys.strip()
     else set()
 )
+
+# OAuth2 client credentials — comma-separated list of client_id:client_secret pairs
+# Example: MCP_OAUTH_CLIENTS=claude_ai:secret123,myapp:anothersecret
+# Empty = OAuth disabled
+_raw_clients = os.getenv("MCP_OAUTH_CLIENTS", "")
+MCP_OAUTH_CLIENTS: dict[str, str] = {}
+for _entry in _raw_clients.split(","):
+    _entry = _entry.strip()
+    if ":" in _entry:
+        _cid, _csecret = _entry.split(":", 1)
+        MCP_OAUTH_CLIENTS[_cid.strip()] = _csecret.strip()
+
+# Secret key for signing JWT tokens — generate with: python3 -c "import secrets; print(secrets.token_hex(32))"
+MCP_JWT_SECRET: str = os.getenv("MCP_JWT_SECRET", "")
+MCP_JWT_EXPIRY_SECONDS: int = int(os.getenv("MCP_JWT_EXPIRY_SECONDS", "3600"))
 SHOW_TEMPLATE_DESCRIPTION: bool = os.getenv("SHOW_TEMPLATE_DESCRIPTION", "false").lower() == "true"
 ENABLE_ANALYSIS: bool = os.getenv("ENABLE_ANALYSIS", "true").lower() == "true"
 
