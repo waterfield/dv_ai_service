@@ -72,7 +72,7 @@ class AFEFinancialRequest(BaseModel):
     month:      int | None = Field(None, ge=1,    le=12,   description="Month number 1-12; use with budget_by_month / actuals_by_month / budget_vs_actuals_by_month")
     status:     Literal["Open", "Completed", "Rejected"] | None = None
     afe_type_description:   Literal["Expense Workover", "Plug & Abandonment", "Recompletion", "Reclamation", "Stake & Permit", "Facility", "Land/Acquisition", "Nonop Drill & Complete", "Environmental", "Lease and Well Equipment", "Other", "Geological & Geospatial", "Drill & Complete", "Internal"] | None = None
-    afe_number: str | None = Field(None, description="Specific AFE identifier e.g. AFE-2025-001")
+    afe_numbers: list[str] | None = Field(None, description="One or more AFE numbers to filter on e.g. ['AFE-2025-001', 'AFE-2025-002']. Use when user provides specific AFEs from a prior afe_master lookup.")
     top_n:      int = Field(20, ge=1, le=100, description="Maximum rows to return")
 
 
@@ -117,6 +117,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
           AND (:year     IS NULL OR YEAR(fb.afe_budget_date) = :year)
           AND (:status   IS NULL OR da.status   = :status)
           AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+          /*AFE_NUMBERS_FILTER*/
         GROUP BY dc.name
         ORDER BY [Budget Amount] DESC
     """,
@@ -133,7 +134,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
           AND (:year       IS NULL OR YEAR(fb.afe_budget_date) = :year)
           AND (:status     IS NULL OR da.status     = :status)
           AND (:afe_type_description   IS NULL OR da.afe_type_description   = :afe_type_description)
-          AND (:afe_number IS NULL OR da.number = :afe_number)
+          /*AFE_NUMBERS_FILTER*/
         GROUP BY da.number, da.name, da.status
         ORDER BY [Budget Amount] DESC
     """,
@@ -148,6 +149,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         WHERE fb.approved_copy = 0
           AND (:year   IS NULL OR YEAR(fb.afe_budget_date) = :year)
           AND (:status IS NULL OR da.status = :status)
+          /*AFE_NUMBERS_FILTER*/
         GROUP BY da.afe_type_description
         ORDER BY [Budget Amount] DESC
     """,
@@ -163,6 +165,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
           AND (:year             IS NULL OR YEAR(fb.afe_budget_date) = :year)
           AND (:status           IS NULL OR da.status = :status)
           AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+          /*AFE_NUMBERS_FILTER*/
         GROUP BY da.afe_project_name
         ORDER BY [Budget Amount] DESC
     """,
@@ -176,6 +179,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         WHERE fb.approved_copy = 0
           AND (:status   IS NULL OR da.status   = :status)
           AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+          /*AFE_NUMBERS_FILTER*/
         GROUP BY YEAR(fb.afe_budget_date)
         ORDER BY [Year] DESC
     """,
@@ -192,6 +196,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
           AND (:month  IS NULL OR MONTH(fb.afe_budget_date) = :month)
           AND (:status IS NULL OR da.status = :status)
           AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+          /*AFE_NUMBERS_FILTER*/
         GROUP BY YEAR(fb.afe_budget_date), MONTH(fb.afe_budget_date)
         ORDER BY [Year] DESC, [Month] ASC
     """,
@@ -206,6 +211,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         WHERE fb.approved_copy = 0
           AND (:year   IS NULL OR YEAR(fb.afe_budget_date) = :year)
           AND (:status IS NULL OR da.status = :status)
+          /*AFE_NUMBERS_FILTER*/
         GROUP BY YEAR(fb.afe_budget_date), DATEPART(QUARTER, fb.afe_budget_date)
         ORDER BY [Year] DESC, [Quarter] ASC
     """,
@@ -220,6 +226,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
           AND (:year     IS NULL OR YEAR(fb.afe_budget_date) = :year)
           AND (:status   IS NULL OR da.status   = :status)
           AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+          /*AFE_NUMBERS_FILTER*/
     """,
 
     "actuals_by_cost_center": """
@@ -232,6 +239,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         WHERE (:year     IS NULL OR YEAR(fa.accounting_date) = :year)
           AND (:status   IS NULL OR da.status   = :status)
           AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+          /*AFE_NUMBERS_FILTER*/
         GROUP BY dc.name
         ORDER BY [Actual Amount] DESC
     """,
@@ -246,7 +254,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         JOIN dim_afe da ON fa.afe_id = da.id
         WHERE (:year       IS NULL OR YEAR(fa.accounting_date) = :year)
           AND (:status     IS NULL OR da.status     = :status)
-          AND (:afe_number IS NULL OR da.number = :afe_number)
+          /*AFE_NUMBERS_FILTER*/
         GROUP BY da.number, da.name, da.status
         ORDER BY [Actual Amount] DESC
     """,
@@ -260,6 +268,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         JOIN dim_afe da ON fa.afe_id = da.id
         WHERE (:year   IS NULL OR YEAR(fa.accounting_date) = :year)
           AND (:status IS NULL OR da.status = :status)
+          /*AFE_NUMBERS_FILTER*/
         GROUP BY da.afe_type_description
         ORDER BY [Actual Amount] DESC
     """,
@@ -274,6 +283,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         WHERE (:year             IS NULL OR YEAR(fa.accounting_date) = :year)
           AND (:status           IS NULL OR da.status = :status)
           AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+          /*AFE_NUMBERS_FILTER*/
         GROUP BY da.afe_project_name
         ORDER BY [Actual Amount] DESC
     """,
@@ -286,6 +296,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         JOIN dim_afe da ON fa.afe_id = da.id
         WHERE (:status   IS NULL OR da.status   = :status)
           AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+          /*AFE_NUMBERS_FILTER*/
         GROUP BY YEAR(fa.accounting_date)
         ORDER BY [Year] DESC
     """,
@@ -301,6 +312,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
           AND (:month  IS NULL OR MONTH(fa.accounting_date) = :month)
           AND (:status IS NULL OR da.status = :status)
           AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+          /*AFE_NUMBERS_FILTER*/
         GROUP BY YEAR(fa.accounting_date), MONTH(fa.accounting_date)
         ORDER BY [Year] DESC, [Month] ASC
     """,
@@ -314,6 +326,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         JOIN dim_afe da ON fa.afe_id = da.id
         WHERE (:year   IS NULL OR YEAR(fa.accounting_date) = :year)
           AND (:status IS NULL OR da.status = :status)
+          /*AFE_NUMBERS_FILTER*/
         GROUP BY YEAR(fa.accounting_date), DATEPART(QUARTER, fa.accounting_date)
         ORDER BY [Year] DESC, [Quarter] ASC
     """,
@@ -327,6 +340,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             WHERE fb.approved_copy = 0
               AND (:status   IS NULL OR da.status   = :status)
               AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+              /*AFE_NUMBERS_FILTER*/
             GROUP BY YEAR(fb.afe_budget_date)
         ),
         actuals AS (
@@ -336,6 +350,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             JOIN dim_afe da ON fa.afe_id = da.id
             WHERE (:status   IS NULL OR da.status   = :status)
               AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+              /*AFE_NUMBERS_FILTER*/
             GROUP BY YEAR(fa.accounting_date)
         )
         SELECT TOP (:top_n)
@@ -363,6 +378,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
               AND (:month  IS NULL OR MONTH(fb.afe_budget_date) = :month)
               AND (:status IS NULL OR da.status = :status)
               AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+              /*AFE_NUMBERS_FILTER*/
             GROUP BY YEAR(fb.afe_budget_date), MONTH(fb.afe_budget_date)
         ),
         actuals AS (
@@ -375,6 +391,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
               AND (:month  IS NULL OR MONTH(fa.accounting_date) = :month)
               AND (:status IS NULL OR da.status = :status)
               AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+              /*AFE_NUMBERS_FILTER*/
             GROUP BY YEAR(fa.accounting_date), MONTH(fa.accounting_date)
         )
         SELECT TOP (:top_n)
@@ -400,6 +417,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             WHERE fb.approved_copy = 0
               AND (:year     IS NULL OR YEAR(fb.afe_budget_date) = :year)
               AND (:status   IS NULL OR da.status   = :status)
+              /*AFE_NUMBERS_FILTER*/
             GROUP BY da.number, da.name, da.status
         ),
         actuals AS (
@@ -408,6 +426,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             FROM fact_afe_actuals fa
             JOIN dim_afe da ON fa.afe_id = da.id
             WHERE (:year   IS NULL OR YEAR(fa.accounting_date) = :year)
+              /*AFE_NUMBERS_FILTER*/
             GROUP BY da.number
         )
         SELECT TOP (:top_n)
@@ -434,6 +453,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             WHERE fb.approved_copy = 0
               AND (:year   IS NULL OR YEAR(fb.afe_budget_date) = :year)
               AND (:status IS NULL OR da.status = :status)
+              /*AFE_NUMBERS_FILTER*/
             GROUP BY dc.name
         ),
         actuals AS (
@@ -444,6 +464,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             JOIN dim_afe da         ON fa.afe_id = da.id
             WHERE (:year   IS NULL OR YEAR(fa.accounting_date) = :year)
               AND (:status IS NULL OR da.status = :status)
+              /*AFE_NUMBERS_FILTER*/
             GROUP BY dc.name
         )
         SELECT TOP (:top_n)
@@ -468,6 +489,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             WHERE fb.approved_copy = 0
               AND (:year   IS NULL OR YEAR(fb.afe_budget_date) = :year)
               AND (:status IS NULL OR da.status = :status)
+              /*AFE_NUMBERS_FILTER*/
             GROUP BY da.afe_type_description
         ),
         actuals AS (
@@ -477,6 +499,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             JOIN dim_afe da ON fa.afe_id = da.id
             WHERE (:year   IS NULL OR YEAR(fa.accounting_date) = :year)
               AND (:status IS NULL OR da.status = :status)
+              /*AFE_NUMBERS_FILTER*/
             GROUP BY da.afe_type_description
         )
         SELECT TOP (:top_n)
@@ -502,6 +525,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
               AND (:year             IS NULL OR YEAR(fb.afe_budget_date) = :year)
               AND (:status           IS NULL OR da.status = :status)
               AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+              /*AFE_NUMBERS_FILTER*/
             GROUP BY da.afe_project_name
         ),
         actuals AS (
@@ -512,6 +536,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             WHERE (:year             IS NULL OR YEAR(fa.accounting_date) = :year)
               AND (:status           IS NULL OR da.status = :status)
               AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+              /*AFE_NUMBERS_FILTER*/
             GROUP BY da.afe_project_name
         )
         SELECT TOP (:top_n)
@@ -536,6 +561,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             WHERE fb.approved_copy = 0
               AND (:year   IS NULL OR YEAR(fb.afe_budget_date) = :year)
               AND (:status IS NULL OR da.status = :status)
+              /*AFE_NUMBERS_FILTER*/
             GROUP BY da.number, da.name, da.status
         ),
         actuals AS (
@@ -584,6 +610,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             JOIN dim_afe da         ON fb.afe_id = da.id
             WHERE fb.approved_copy = 0
               AND (:year   IS NULL OR YEAR(fb.afe_budget_date) = :year)
+              /*AFE_NUMBERS_FILTER*/
             GROUP BY dc.name
         ),
         actuals AS (
@@ -593,6 +620,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             JOIN dim_cost_center dc ON fa.cost_center_id = dc.id
             JOIN dim_afe da         ON fa.afe_id = da.id
             WHERE (:year   IS NULL OR YEAR(fa.accounting_date) = :year)
+              /*AFE_NUMBERS_FILTER*/
             GROUP BY dc.name
         )
         SELECT TOP (:top_n)
@@ -615,6 +643,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             WHERE fb.approved_copy = 0
               AND (:year   IS NULL OR YEAR(fb.afe_budget_date) = :year)
               AND (:status IS NULL OR da.status = :status)
+              /*AFE_NUMBERS_FILTER*/
             GROUP BY da.number, da.name, da.status
         ),
         actuals AS (
@@ -647,6 +676,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             WHERE fb.approved_copy = 0
               AND (:year   IS NULL OR YEAR(fb.afe_budget_date) = :year)
               AND (:status IS NULL OR da.status = :status)
+              /*AFE_NUMBERS_FILTER*/
             GROUP BY da.number, da.name, da.status
         ),
         actuals AS (
@@ -695,9 +725,16 @@ def resolve_afe_financial(tool_args: dict) -> tuple[str, dict, str]:
         "month":                request.month,
         "status":               request.status,
         "afe_type_description": request.afe_type_description,
-        "afe_number":           request.afe_number,
         "top_n":                request.top_n,
     }
+    if request.afe_numbers:
+        placeholders = ", ".join(f":afe_n_{i}" for i in range(len(request.afe_numbers)))
+        afe_filter = f"AND da.number IN ({placeholders})"
+        for i, n in enumerate(request.afe_numbers):
+            params[f"afe_n_{i}"] = n
+    else:
+        afe_filter = ""
+    sql = sql.replace("/*AFE_NUMBERS_FILTER*/", afe_filter)
     reasoning = TEMPLATE_DESCRIPTIONS.get(request.template, request.template)
     return sql, params, reasoning
 
