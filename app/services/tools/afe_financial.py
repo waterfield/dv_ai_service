@@ -108,8 +108,9 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
 
     "budget_by_cost_center": """
         SELECT TOP (:top_n)
-            dc.name             AS [Cost Center],
-            SUM(fb.amount)      AS [Budget Amount]
+            dc.name                                               AS [Cost Center],
+            SUM(fb.amount)                                        AS [Budget Amount],
+            SUM(fb.amount * COALESCE(da.net_interest, 1))         AS [Net Budget Amount]
         FROM fact_afe_budgets fb
         JOIN dim_cost_center dc ON fb.cost_center_id = dc.id
         JOIN dim_afe da         ON fb.afe_id = da.id
@@ -124,10 +125,11 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
 
     "budget_by_afe": """
         SELECT TOP (:top_n)
-            da.number       AS [AFE Number],
-            da.name             AS [AFE Name],
-            da.status           AS [Status],
-            SUM(fb.amount)      AS [Budget Amount]
+            da.number                                             AS [AFE Number],
+            da.name                                               AS [AFE Name],
+            da.status                                             AS [Status],
+            SUM(fb.amount)                                        AS [Budget Amount],
+            SUM(fb.amount * COALESCE(da.net_interest, 1))         AS [Net Budget Amount]
         FROM fact_afe_budgets fb
         JOIN dim_afe da ON fb.afe_id = da.id
         WHERE fb.approved_copy = 0
@@ -141,9 +143,10 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
 
     "budget_by_afe_type": """
         SELECT TOP (:top_n)
-            da.afe_type_description     AS [AFE Type],
-            SUM(fb.amount)              AS [Budget Amount],
-            COUNT(DISTINCT da.number)   AS [AFE Count]
+            da.afe_type_description                               AS [AFE Type],
+            SUM(fb.amount)                                        AS [Budget Amount],
+            SUM(fb.amount * COALESCE(da.net_interest, 1))         AS [Net Budget Amount],
+            COUNT(DISTINCT da.number)                             AS [AFE Count]
         FROM fact_afe_budgets fb
         JOIN dim_afe da ON fb.afe_id = da.id
         WHERE fb.approved_copy = 0
@@ -156,9 +159,10 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
 
     "budget_by_project": """
         SELECT TOP (:top_n)
-            da.afe_project_name         AS [Project],
-            SUM(fb.amount)              AS [Budget Amount],
-            COUNT(DISTINCT da.number)   AS [AFE Count]
+            da.afe_project_name                                   AS [Project],
+            SUM(fb.amount)                                        AS [Budget Amount],
+            SUM(fb.amount * COALESCE(da.net_interest, 1))         AS [Net Budget Amount],
+            COUNT(DISTINCT da.number)                             AS [AFE Count]
         FROM fact_afe_budgets fb
         JOIN dim_afe da ON fb.afe_id = da.id
         WHERE fb.approved_copy = 0
@@ -172,8 +176,9 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
 
     "budget_by_year": """
         SELECT TOP (:top_n)
-            YEAR(fb.afe_budget_date)    AS [Year],
-            SUM(fb.amount)              AS [Budget Amount]
+            YEAR(fb.afe_budget_date)                              AS [Year],
+            SUM(fb.amount)                                        AS [Budget Amount],
+            SUM(fb.amount * COALESCE(da.net_interest, 1))         AS [Net Budget Amount]
         FROM fact_afe_budgets fb
         JOIN dim_afe da ON fb.afe_id = da.id
         WHERE fb.approved_copy = 0
@@ -186,9 +191,10 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
 
     "budget_by_month": """
         SELECT TOP (:top_n)
-            YEAR(fb.afe_budget_date)    AS [Year],
-            MONTH(fb.afe_budget_date)   AS [Month],
-            SUM(fb.amount)              AS [Budget Amount]
+            YEAR(fb.afe_budget_date)                              AS [Year],
+            MONTH(fb.afe_budget_date)                             AS [Month],
+            SUM(fb.amount)                                        AS [Budget Amount],
+            SUM(fb.amount * COALESCE(da.net_interest, 1))         AS [Net Budget Amount]
         FROM fact_afe_budgets fb
         JOIN dim_afe da ON fb.afe_id = da.id
         WHERE fb.approved_copy = 0
@@ -203,9 +209,10 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
 
     "budget_by_quarter": """
         SELECT TOP (:top_n)
-            YEAR(fb.afe_budget_date)                AS [Year],
-            DATEPART(QUARTER, fb.afe_budget_date)   AS [Quarter],
-            SUM(fb.amount)                          AS [Budget Amount]
+            YEAR(fb.afe_budget_date)                              AS [Year],
+            DATEPART(QUARTER, fb.afe_budget_date)                 AS [Quarter],
+            SUM(fb.amount)                                        AS [Budget Amount],
+            SUM(fb.amount * COALESCE(da.net_interest, 1))         AS [Net Budget Amount]
         FROM fact_afe_budgets fb
         JOIN dim_afe da ON fb.afe_id = da.id
         WHERE fb.approved_copy = 0
@@ -218,8 +225,9 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
 
     "budget_total": """
         SELECT
-            SUM(fb.amount)                  AS [Budget Amount],
-            COUNT(DISTINCT da.number)   AS [AFE Count]
+            SUM(fb.amount)                                        AS [Budget Amount],
+            SUM(fb.amount * COALESCE(da.net_interest, 1))         AS [Net Budget Amount],
+            COUNT(DISTINCT da.number)                             AS [AFE Count]
         FROM fact_afe_budgets fb
         JOIN dim_afe da ON fb.afe_id = da.id
         WHERE fb.approved_copy = 0
@@ -333,8 +341,9 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
 
     "budget_vs_actuals_by_year": """
         WITH budgets AS (
-            SELECT YEAR(fb.afe_budget_date)  AS [Year],
-                   SUM(fb.amount)            AS [Budget Amount]
+            SELECT YEAR(fb.afe_budget_date)                           AS [Year],
+                   SUM(fb.amount)                                     AS [Budget Amount],
+                   SUM(fb.amount * COALESCE(da.net_interest, 1))      AS [Net Budget Amount]
             FROM fact_afe_budgets fb
             JOIN dim_afe da ON fb.afe_id = da.id
             WHERE fb.approved_copy = 0
@@ -356,6 +365,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         SELECT TOP (:top_n)
             COALESCE(b.[Year], a.[Year])                                      AS [Year],
             COALESCE(b.[Budget Amount], 0)                                    AS [Budget Amount],
+            COALESCE(b.[Net Budget Amount], 0)                                AS [Net Budget Amount],
             COALESCE(a.[Actual Amount], 0)                                    AS [Actual Amount],
             COALESCE(a.[Actual Amount], 0) - COALESCE(b.[Budget Amount], 0)   AS [Variance],
             IIF(COALESCE(b.[Budget Amount], 0) > 0,
@@ -368,9 +378,10 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
 
     "budget_vs_actuals_by_month": """
         WITH budgets AS (
-            SELECT YEAR(fb.afe_budget_date)   AS [Year],
-                   MONTH(fb.afe_budget_date)  AS [Month],
-                   SUM(fb.amount)             AS [Budget Amount]
+            SELECT YEAR(fb.afe_budget_date)                           AS [Year],
+                   MONTH(fb.afe_budget_date)                          AS [Month],
+                   SUM(fb.amount)                                     AS [Budget Amount],
+                   SUM(fb.amount * COALESCE(da.net_interest, 1))      AS [Net Budget Amount]
             FROM fact_afe_budgets fb
             JOIN dim_afe da ON fb.afe_id = da.id
             WHERE fb.approved_copy = 0
@@ -398,6 +409,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             COALESCE(b.[Year],  a.[Year])                                         AS [Year],
             COALESCE(b.[Month], a.[Month])                                        AS [Month],
             COALESCE(b.[Budget Amount], 0)                                        AS [Budget Amount],
+            COALESCE(b.[Net Budget Amount], 0)                                    AS [Net Budget Amount],
             COALESCE(a.[Actual Amount], 0)                                        AS [Actual Amount],
             COALESCE(a.[Actual Amount], 0) - COALESCE(b.[Budget Amount], 0)       AS [Variance],
             IIF(COALESCE(b.[Budget Amount], 0) > 0,
@@ -411,7 +423,8 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
     "budget_vs_actuals_by_afe": """
         WITH budgets AS (
             SELECT da.number afe_number, da.name, da.status,
-                   SUM(fb.amount)  AS [Budget Amount]
+                   SUM(fb.amount)                                AS [Budget Amount],
+                   SUM(fb.amount * COALESCE(da.net_interest, 1)) AS [Net Budget Amount]
             FROM fact_afe_budgets fb
             JOIN dim_afe da ON fb.afe_id = da.id
             WHERE fb.approved_copy = 0
@@ -434,6 +447,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             b.name                                                            AS [AFE Name],
             b.status                                                          AS [Status],
             COALESCE(b.[Budget Amount], 0)                                    AS [Budget Amount],
+            COALESCE(b.[Net Budget Amount], 0)                                AS [Net Budget Amount],
             COALESCE(a.[Actual Amount], 0)                                    AS [Actual Amount],
             COALESCE(a.[Actual Amount], 0) - COALESCE(b.[Budget Amount], 0)   AS [Variance],
             IIF(COALESCE(b.[Budget Amount], 0) > 0,
@@ -445,8 +459,9 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
 
     "budget_vs_actuals_by_cost_center": """
         WITH budgets AS (
-            SELECT dc.name          AS [Cost Center],
-                   SUM(fb.amount)   AS [Budget Amount]
+            SELECT dc.name                                           AS [Cost Center],
+                   SUM(fb.amount)                                    AS [Budget Amount],
+                   SUM(fb.amount * COALESCE(da.net_interest, 1))     AS [Net Budget Amount]
             FROM fact_afe_budgets fb
             JOIN dim_cost_center dc ON fb.cost_center_id = dc.id
             JOIN dim_afe da         ON fb.afe_id = da.id
@@ -470,6 +485,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         SELECT TOP (:top_n)
             COALESCE(b.[Cost Center], a.[Cost Center])               AS [Cost Center],
             COALESCE(b.[Budget Amount], 0)                           AS [Budget Amount],
+            COALESCE(b.[Net Budget Amount], 0)                       AS [Net Budget Amount],
             COALESCE(a.[Actual Amount], 0)                           AS [Actual Amount],
             COALESCE(a.[Actual Amount], 0) - COALESCE(b.[Budget Amount], 0) AS [Variance],
             IIF(COALESCE(b.[Budget Amount], 0) > 0,
@@ -482,8 +498,9 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
 
     "budget_vs_actuals_by_afe_type": """
         WITH budgets AS (
-            SELECT da.afe_type_description      AS [AFE Type],
-                   SUM(fb.amount)               AS [Budget Amount]
+            SELECT da.afe_type_description                           AS [AFE Type],
+                   SUM(fb.amount)                                    AS [Budget Amount],
+                   SUM(fb.amount * COALESCE(da.net_interest, 1))     AS [Net Budget Amount]
             FROM fact_afe_budgets fb
             JOIN dim_afe da ON fb.afe_id = da.id
             WHERE fb.approved_copy = 0
@@ -505,6 +522,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         SELECT TOP (:top_n)
             COALESCE(b.[AFE Type], a.[AFE Type])                                  AS [AFE Type],
             COALESCE(b.[Budget Amount], 0)                                        AS [Budget Amount],
+            COALESCE(b.[Net Budget Amount], 0)                                    AS [Net Budget Amount],
             COALESCE(a.[Actual Amount], 0)                                        AS [Actual Amount],
             COALESCE(a.[Actual Amount], 0) - COALESCE(b.[Budget Amount], 0)       AS [Variance],
             IIF(COALESCE(b.[Budget Amount], 0) > 0,
@@ -517,8 +535,9 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
 
     "budget_vs_actuals_by_project": """
         WITH budgets AS (
-            SELECT da.afe_project_name          AS [Project],
-                   SUM(fb.amount)               AS [Budget Amount]
+            SELECT da.afe_project_name                               AS [Project],
+                   SUM(fb.amount)                                    AS [Budget Amount],
+                   SUM(fb.amount * COALESCE(da.net_interest, 1))     AS [Net Budget Amount]
             FROM fact_afe_budgets fb
             JOIN dim_afe da ON fb.afe_id = da.id
             WHERE fb.approved_copy = 0
@@ -542,6 +561,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         SELECT TOP (:top_n)
             COALESCE(b.[Project], a.[Project])                                    AS [Project],
             COALESCE(b.[Budget Amount], 0)                                        AS [Budget Amount],
+            COALESCE(b.[Net Budget Amount], 0)                                    AS [Net Budget Amount],
             COALESCE(a.[Actual Amount], 0)                                        AS [Actual Amount],
             COALESCE(a.[Actual Amount], 0) - COALESCE(b.[Budget Amount], 0)       AS [Variance],
             IIF(COALESCE(b.[Budget Amount], 0) > 0,
@@ -555,7 +575,8 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
     "full_picture_by_afe": """
         WITH budgets AS (
             SELECT da.number afe_number, da.name, da.status,
-                   SUM(fb.amount)           AS [Budget Amount]
+                   SUM(fb.amount)                                AS [Budget Amount],
+                   SUM(fb.amount * COALESCE(da.net_interest, 1)) AS [Net Budget Amount]
             FROM fact_afe_budgets fb
             JOIN dim_afe da ON fb.afe_id = da.id
             WHERE fb.approved_copy = 0
@@ -584,6 +605,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             b.name                                                      AS [AFE Name],
             b.status                                                    AS [Status],
             COALESCE(b.[Budget Amount],    0)                           AS [Budget Amount],
+            COALESCE(b.[Net Budget Amount], 0)                          AS [Net Budget Amount],
             COALESCE(a.[Actual Amount],    0)                           AS [Actual Amount],
             COALESCE(c.[Committed Amount], 0)                           AS [Committed Amount],
             COALESCE(b.[Budget Amount],    0)
@@ -603,8 +625,9 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
 
     "consumed_pct_by_cost_center": """
         WITH budgets AS (
-            SELECT dc.name          AS [Cost Center],
-                   SUM(fb.amount)   AS [Budget Amount]
+            SELECT dc.name                                           AS [Cost Center],
+                   SUM(fb.amount)                                    AS [Budget Amount],
+                   SUM(fb.amount * COALESCE(da.net_interest, 1))     AS [Net Budget Amount]
             FROM fact_afe_budgets fb
             JOIN dim_cost_center dc ON fb.cost_center_id = dc.id
             JOIN dim_afe da         ON fb.afe_id = da.id
@@ -625,8 +648,9 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
         )
         SELECT TOP (:top_n)
             b.[Cost Center],
-            COALESCE(b.[Budget Amount], 0)  AS [Budget Amount],
-            COALESCE(a.[Actual Amount], 0)  AS [Actual Amount],
+            COALESCE(b.[Budget Amount], 0)     AS [Budget Amount],
+            COALESCE(b.[Net Budget Amount], 0)  AS [Net Budget Amount],
+            COALESCE(a.[Actual Amount], 0)     AS [Actual Amount],
             IIF(COALESCE(b.[Budget Amount], 0) > 0,
                 COALESCE(a.[Actual Amount], 0) * 100.0 / b.[Budget Amount], 0) AS [% Consumed]
         FROM budgets b
@@ -637,7 +661,8 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
     "consumed_pct_by_afe": """
         WITH budgets AS (
             SELECT da.number afe_number, da.name, da.status,
-                   SUM(fb.amount) AS [Budget Amount]
+                   SUM(fb.amount)                                AS [Budget Amount],
+                   SUM(fb.amount * COALESCE(da.net_interest, 1)) AS [Net Budget Amount]
             FROM fact_afe_budgets fb
             JOIN dim_afe da ON fb.afe_id = da.id
             WHERE fb.approved_copy = 0
@@ -659,6 +684,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             b.name                                                   AS [AFE Name],
             b.status                                                 AS [Status],
             COALESCE(b.[Budget Amount], 0)                           AS [Budget Amount],
+            COALESCE(b.[Net Budget Amount], 0)                       AS [Net Budget Amount],
             COALESCE(a.[Actual Amount], 0)                           AS [Actual Amount],
             IIF(COALESCE(b.[Budget Amount], 0) > 0,
                 COALESCE(a.[Actual Amount], 0) * 100.0 / b.[Budget Amount], 0) AS [% Consumed]
@@ -670,7 +696,8 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
     "remaining_by_afe": """
         WITH budgets AS (
             SELECT da.number afe_number, da.name, da.status,
-                   SUM(fb.amount) AS [Budget Amount]
+                   SUM(fb.amount)                                AS [Budget Amount],
+                   SUM(fb.amount * COALESCE(da.net_interest, 1)) AS [Net Budget Amount]
             FROM fact_afe_budgets fb
             JOIN dim_afe da ON fb.afe_id = da.id
             WHERE fb.approved_copy = 0
@@ -699,6 +726,7 @@ AFE_FINANCIAL_TEMPLATES: dict[str, str] = {
             b.name                                                    AS [AFE Name],
             b.status                                                  AS [Status],
             COALESCE(b.[Budget Amount],    0)                         AS [Budget Amount],
+            COALESCE(b.[Net Budget Amount], 0)                        AS [Net Budget Amount],
             COALESCE(a.[Actual Amount],    0)                         AS [Actual Amount],
             COALESCE(c.[Committed Amount], 0)                         AS [Committed Amount],
             COALESCE(b.[Budget Amount],    0)
