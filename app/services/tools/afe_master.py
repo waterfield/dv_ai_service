@@ -9,6 +9,10 @@ class AFEMasterRequest(BaseModel):
     Use for ANY question about AFE properties, lists, details, timelines, approvals,
     rejections, or metadata. Do NOT use for budget/actuals/spend — use afe_financial instead.
 
+    Date range filters: approved_date_from/to (final_approval_date), completion_date_from/to
+    (completion_date), closed_date_from/to (closed_date). All accept YYYY-MM-DD strings.
+    Use both _from and _to for "between X and Y"; either alone for "after X" or "before Y".
+
     template guide:
       list_afes               -> list individual AFEs; use when user asks for AFEs under/in/belonging to a specific project, company, type, or status — filters by those values
       afe_detail              -> full details for a specific AFE number
@@ -35,7 +39,13 @@ class AFEMasterRequest(BaseModel):
         "recently_approved",
     ]
 
-    year:                 int | None = Field(None, ge=2000, le=2030, description="Filter by planned start year")
+    year:                 int | None = Field(None, ge=2000, le=2030, description="Filter by planned start year (exact)")
+    approved_date_from:   str | None = Field(None, description="Final approval date range start (YYYY-MM-DD) — use for 'approved after X' or 'approved between X and Y'")
+    approved_date_to:     str | None = Field(None, description="Final approval date range end (YYYY-MM-DD) — use for 'approved before Y' or 'approved between X and Y'")
+    completion_date_from: str | None = Field(None, description="Actual completion date range start (YYYY-MM-DD) — use for 'completed after X' or 'completed between X and Y'")
+    completion_date_to:   str | None = Field(None, description="Actual completion date range end (YYYY-MM-DD)")
+    closed_date_from:     str | None = Field(None, description="Closed date range start (YYYY-MM-DD) — use for 'closed after X' or 'closed between X and Y'")
+    closed_date_to:       str | None = Field(None, description="Closed date range end (YYYY-MM-DD)")
     status:               Literal["Open", "Completed", "Rejected"] | None = None
     afe_type_description: Literal[
         "Expense Workover", "Plug & Abandonment", "Recompletion", "Reclamation",
@@ -74,14 +84,23 @@ AFE_MASTER_TEMPLATES: dict[str, str] = {
             da.company_name             AS [Company],
             da.planned_start_date       AS [Planned Start],
             da.planned_completion_date  AS [Planned Completion],
+            da.final_approval_date      AS [Approval Date],
+            da.completion_date          AS [Completion Date],
+            da.closed_date              AS [Closed Date],
             da.budget_total             AS [Budget Total]
         FROM dim_afe da
-        WHERE (:year              IS NULL OR YEAR(da.planned_start_date) = :year)
-          AND (:status            IS NULL OR da.status = :status)
-          AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
-          AND (:afe_number        IS NULL OR da.number = :afe_number)
-          AND (:afe_project_name  IS NULL OR da.afe_project_name = :afe_project_name)
-          AND (:company_name      IS NULL OR da.company_name = :company_name)
+        WHERE (:year                  IS NULL OR YEAR(da.planned_start_date) = :year)
+          AND (:status                IS NULL OR da.status = :status)
+          AND (:afe_type_description  IS NULL OR da.afe_type_description = :afe_type_description)
+          AND (:afe_number            IS NULL OR da.number = :afe_number)
+          AND (:afe_project_name      IS NULL OR da.afe_project_name = :afe_project_name)
+          AND (:company_name          IS NULL OR da.company_name = :company_name)
+          AND (:approved_date_from    IS NULL OR da.final_approval_date >= :approved_date_from)
+          AND (:approved_date_to      IS NULL OR da.final_approval_date <= :approved_date_to)
+          AND (:completion_date_from  IS NULL OR da.completion_date >= :completion_date_from)
+          AND (:completion_date_to    IS NULL OR da.completion_date <= :completion_date_to)
+          AND (:closed_date_from      IS NULL OR da.closed_date >= :closed_date_from)
+          AND (:closed_date_to        IS NULL OR da.closed_date <= :closed_date_to)
         ORDER BY da.planned_start_date DESC
     """,
 
@@ -110,8 +129,16 @@ AFE_MASTER_TEMPLATES: dict[str, str] = {
             da.financial_afe_number     AS [Financial AFE Number],
             da.reject_reason            AS [Reject Reason]
         FROM dim_afe da
-        WHERE (:afe_number IS NULL OR da.number = :afe_number)
-          AND (:status     IS NULL OR da.status = :status)
+        WHERE (:afe_number            IS NULL OR da.number = :afe_number)
+          AND (:status                IS NULL OR da.status = :status)
+          AND (:company_name          IS NULL OR da.company_name = :company_name)
+          AND (:afe_type_description  IS NULL OR da.afe_type_description = :afe_type_description)
+          AND (:approved_date_from    IS NULL OR da.final_approval_date >= :approved_date_from)
+          AND (:approved_date_to      IS NULL OR da.final_approval_date <= :approved_date_to)
+          AND (:completion_date_from  IS NULL OR da.completion_date >= :completion_date_from)
+          AND (:completion_date_to    IS NULL OR da.completion_date <= :completion_date_to)
+          AND (:closed_date_from      IS NULL OR da.closed_date >= :closed_date_from)
+          AND (:closed_date_to        IS NULL OR da.closed_date <= :closed_date_to)
         ORDER BY da.planned_start_date DESC
     """,
 
@@ -121,8 +148,15 @@ AFE_MASTER_TEMPLATES: dict[str, str] = {
             COUNT(*)                    AS [AFE Count],
             SUM(da.budget_total)        AS [Total Budget]
         FROM dim_afe da
-        WHERE (:year   IS NULL OR YEAR(da.planned_start_date) = :year)
-          AND (:status IS NULL OR da.status = :status)
+        WHERE (:year                  IS NULL OR YEAR(da.planned_start_date) = :year)
+          AND (:status                IS NULL OR da.status = :status)
+          AND (:company_name          IS NULL OR da.company_name = :company_name)
+          AND (:approved_date_from    IS NULL OR da.final_approval_date >= :approved_date_from)
+          AND (:approved_date_to      IS NULL OR da.final_approval_date <= :approved_date_to)
+          AND (:completion_date_from  IS NULL OR da.completion_date >= :completion_date_from)
+          AND (:completion_date_to    IS NULL OR da.completion_date <= :completion_date_to)
+          AND (:closed_date_from      IS NULL OR da.closed_date >= :closed_date_from)
+          AND (:closed_date_to        IS NULL OR da.closed_date <= :closed_date_to)
         GROUP BY da.afe_type_description
         ORDER BY [AFE Count] DESC
     """,
@@ -136,9 +170,16 @@ AFE_MASTER_TEMPLATES: dict[str, str] = {
             MIN(da.planned_start_date)  AS [Earliest Start],
             MAX(da.planned_completion_date) AS [Latest Completion]
         FROM dim_afe da
-        WHERE (:year              IS NULL OR YEAR(da.planned_start_date) = :year)
-          AND (:status            IS NULL OR da.status = :status)
-          AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+        WHERE (:year                  IS NULL OR YEAR(da.planned_start_date) = :year)
+          AND (:status                IS NULL OR da.status = :status)
+          AND (:afe_type_description  IS NULL OR da.afe_type_description = :afe_type_description)
+          AND (:company_name          IS NULL OR da.company_name = :company_name)
+          AND (:approved_date_from    IS NULL OR da.final_approval_date >= :approved_date_from)
+          AND (:approved_date_to      IS NULL OR da.final_approval_date <= :approved_date_to)
+          AND (:completion_date_from  IS NULL OR da.completion_date >= :completion_date_from)
+          AND (:completion_date_to    IS NULL OR da.completion_date <= :completion_date_to)
+          AND (:closed_date_from      IS NULL OR da.closed_date >= :closed_date_from)
+          AND (:closed_date_to        IS NULL OR da.closed_date <= :closed_date_to)
         GROUP BY da.afe_project_number, da.afe_project_name
         ORDER BY [AFE Count] DESC
     """,
@@ -149,9 +190,15 @@ AFE_MASTER_TEMPLATES: dict[str, str] = {
             COUNT(*)                    AS [AFE Count],
             SUM(da.budget_total)        AS [Total Budget]
         FROM dim_afe da
-        WHERE (:year   IS NULL OR YEAR(da.planned_start_date) = :year)
-          AND (:status IS NULL OR da.status = :status)
-          AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+        WHERE (:year                  IS NULL OR YEAR(da.planned_start_date) = :year)
+          AND (:status                IS NULL OR da.status = :status)
+          AND (:afe_type_description  IS NULL OR da.afe_type_description = :afe_type_description)
+          AND (:approved_date_from    IS NULL OR da.final_approval_date >= :approved_date_from)
+          AND (:approved_date_to      IS NULL OR da.final_approval_date <= :approved_date_to)
+          AND (:completion_date_from  IS NULL OR da.completion_date >= :completion_date_from)
+          AND (:completion_date_to    IS NULL OR da.completion_date <= :completion_date_to)
+          AND (:closed_date_from      IS NULL OR da.closed_date >= :closed_date_from)
+          AND (:closed_date_to        IS NULL OR da.closed_date <= :closed_date_to)
         GROUP BY da.company_name
         ORDER BY [AFE Count] DESC
     """,
@@ -163,9 +210,16 @@ AFE_MASTER_TEMPLATES: dict[str, str] = {
             SUM(da.budget_total)        AS [Total Budget]
         FROM dim_afe da
         JOIN dim_cost_center dc ON da.cost_center_id = dc.id
-        WHERE (:year              IS NULL OR YEAR(da.planned_start_date) = :year)
-          AND (:status            IS NULL OR da.status = :status)
-          AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+        WHERE (:year                  IS NULL OR YEAR(da.planned_start_date) = :year)
+          AND (:status                IS NULL OR da.status = :status)
+          AND (:afe_type_description  IS NULL OR da.afe_type_description = :afe_type_description)
+          AND (:company_name          IS NULL OR da.company_name = :company_name)
+          AND (:approved_date_from    IS NULL OR da.final_approval_date >= :approved_date_from)
+          AND (:approved_date_to      IS NULL OR da.final_approval_date <= :approved_date_to)
+          AND (:completion_date_from  IS NULL OR da.completion_date >= :completion_date_from)
+          AND (:completion_date_to    IS NULL OR da.completion_date <= :completion_date_to)
+          AND (:closed_date_from      IS NULL OR da.closed_date >= :closed_date_from)
+          AND (:closed_date_to        IS NULL OR da.closed_date <= :closed_date_to)
         GROUP BY dc.name
         ORDER BY [AFE Count] DESC
     """,
@@ -182,10 +236,12 @@ AFE_MASTER_TEMPLATES: dict[str, str] = {
         FROM dim_afe da
         WHERE da.status = 'Open'
           AND da.planned_completion_date < GETDATE()
-          AND (:year              IS NULL OR YEAR(da.planned_start_date) = :year)
-          AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
-          AND (:afe_project_name  IS NULL OR da.afe_project_name = :afe_project_name)
-          AND (:company_name      IS NULL OR da.company_name = :company_name)
+          AND (:year                  IS NULL OR YEAR(da.planned_start_date) = :year)
+          AND (:afe_type_description  IS NULL OR da.afe_type_description = :afe_type_description)
+          AND (:afe_project_name      IS NULL OR da.afe_project_name = :afe_project_name)
+          AND (:company_name          IS NULL OR da.company_name = :company_name)
+          AND (:approved_date_from    IS NULL OR da.final_approval_date >= :approved_date_from)
+          AND (:approved_date_to      IS NULL OR da.final_approval_date <= :approved_date_to)
         ORDER BY [Days Overdue] DESC
     """,
 
@@ -200,11 +256,11 @@ AFE_MASTER_TEMPLATES: dict[str, str] = {
             da.company_name             AS [Company]
         FROM dim_afe da
         WHERE da.status = 'Rejected'
-          AND (:year              IS NULL OR YEAR(da.status_date) = :year)
-          AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
-          AND (:afe_number        IS NULL OR da.number = :afe_number)
-          AND (:afe_project_name  IS NULL OR da.afe_project_name = :afe_project_name)
-          AND (:company_name      IS NULL OR da.company_name = :company_name)
+          AND (:year                  IS NULL OR YEAR(da.status_date) = :year)
+          AND (:afe_type_description  IS NULL OR da.afe_type_description = :afe_type_description)
+          AND (:afe_number            IS NULL OR da.number = :afe_number)
+          AND (:afe_project_name      IS NULL OR da.afe_project_name = :afe_project_name)
+          AND (:company_name          IS NULL OR da.company_name = :company_name)
         ORDER BY da.status_date DESC
     """,
 
@@ -220,9 +276,11 @@ AFE_MASTER_TEMPLATES: dict[str, str] = {
         FROM dim_afe da
         WHERE da.status = 'Open'
           AND da.planned_completion_date >= GETDATE()
-          AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
-          AND (:afe_project_name  IS NULL OR da.afe_project_name = :afe_project_name)
-          AND (:company_name      IS NULL OR da.company_name = :company_name)
+          AND (:afe_type_description  IS NULL OR da.afe_type_description = :afe_type_description)
+          AND (:afe_project_name      IS NULL OR da.afe_project_name = :afe_project_name)
+          AND (:company_name          IS NULL OR da.company_name = :company_name)
+          AND (:approved_date_from    IS NULL OR da.final_approval_date >= :approved_date_from)
+          AND (:approved_date_to      IS NULL OR da.final_approval_date <= :approved_date_to)
         ORDER BY da.planned_completion_date ASC
     """,
 
@@ -238,11 +296,17 @@ AFE_MASTER_TEMPLATES: dict[str, str] = {
             da.company_name             AS [Company]
         FROM dim_afe da
         WHERE da.final_approval_date IS NOT NULL
-          AND (:year              IS NULL OR YEAR(da.final_approval_date) = :year)
-          AND (:status            IS NULL OR da.status = :status)
-          AND (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
-          AND (:afe_project_name  IS NULL OR da.afe_project_name = :afe_project_name)
-          AND (:company_name      IS NULL OR da.company_name = :company_name)
+          AND (:year                  IS NULL OR YEAR(da.final_approval_date) = :year)
+          AND (:status                IS NULL OR da.status = :status)
+          AND (:afe_type_description  IS NULL OR da.afe_type_description = :afe_type_description)
+          AND (:afe_project_name      IS NULL OR da.afe_project_name = :afe_project_name)
+          AND (:company_name          IS NULL OR da.company_name = :company_name)
+          AND (:approved_date_from    IS NULL OR da.final_approval_date >= :approved_date_from)
+          AND (:approved_date_to      IS NULL OR da.final_approval_date <= :approved_date_to)
+          AND (:completion_date_from  IS NULL OR da.completion_date >= :completion_date_from)
+          AND (:completion_date_to    IS NULL OR da.completion_date <= :completion_date_to)
+          AND (:closed_date_from      IS NULL OR da.closed_date >= :closed_date_from)
+          AND (:closed_date_to        IS NULL OR da.closed_date <= :closed_date_to)
         ORDER BY da.final_approval_date DESC
     """,
 }
@@ -258,6 +322,12 @@ def resolve_afe_master(tool_args: dict) -> tuple[str, dict, str]:
     sql = AFE_MASTER_TEMPLATES[request.template]
     params = {
         "year":                 request.year,
+        "approved_date_from":   request.approved_date_from,
+        "approved_date_to":     request.approved_date_to,
+        "completion_date_from": request.completion_date_from,
+        "completion_date_to":   request.completion_date_to,
+        "closed_date_from":     request.closed_date_from,
+        "closed_date_to":       request.closed_date_to,
         "status":               request.status,
         "afe_type_description": request.afe_type_description,
         "afe_number":           request.afe_number,
