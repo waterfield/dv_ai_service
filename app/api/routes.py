@@ -92,6 +92,7 @@ async def chat(request: ChatRequest):
     session_id = request.session_id
     history = session_store.get_history(session_id) if session_id else []
 
+    logger.info(f"[{qid}] chat: query={request.user_query!r} session={session_id!r}")
     try:
         sql, params, template_key, reasoning, tool_name = template_svc.resolve(
             request.user_query, history=history
@@ -103,6 +104,7 @@ async def chat(request: ChatRequest):
                 {"role": "assistant", "content": f"Selected tool={tool_name} template={template_key}"},
             ])
 
+        logger.info(f"[{qid}] chat ok: tool={tool_name!r} template={template_key!r}")
         return ChatResponse(
             query_id=qid,
             status="sql_generated",
@@ -115,18 +117,20 @@ async def chat(request: ChatRequest):
             timestamp=datetime.now().isoformat(),
         )
     except InvalidParamsError as e:
+        logger.warning(f"[{qid}] invalid_params: tool={e.tool_name!r} template={e.template!r} errors={e.field_errors}")
         return ChatResponse(
             query_id=qid, status="invalid_params", user_query=request.user_query,
             tool_name=e.tool_name, template_key=e.template, error=str(e),
             timestamp=datetime.now().isoformat(),
         )
     except ValueError as e:
+        logger.warning(f"[{qid}] no_template: {e}")
         return ChatResponse(
             query_id=qid, status="no_template", user_query=request.user_query,
             error=str(e), timestamp=datetime.now().isoformat(),
         )
     except Exception as e:
-        logger.error(f"Chat error: {e}")
+        logger.error(f"[{qid}] chat error: {e}", exc_info=True)
         return ChatResponse(
             query_id=qid, status="error", user_query=request.user_query,
             error=str(e), timestamp=datetime.now().isoformat(),
@@ -138,13 +142,16 @@ async def execute(request: ExecuteRequest, db: Session = Depends(get_db)):
     """Execute a pre-written SQL template with bind params."""
     qid = _qid()
     _, _, executor = _services()
+    logger.info(f"[{qid}] execute: params={list((request.params or {}).keys())}")
     df, error = executor.execute(request.sql_query, db, params=request.params)
     if error is None:
+        logger.info(f"[{qid}] execute ok: rows={len(df)}")
         return ExecuteResponse(
             query_id=qid, status="success", sql_query=request.sql_query,
             columns=list(df.columns), rows=df.to_dict(orient="records"),
             row_count=len(df), timestamp=datetime.now().isoformat(),
         )
+    logger.error(f"[{qid}] execute error: {error}")
     return ExecuteResponse(
         query_id=qid, status="error", sql_query=request.sql_query,
         error=error, timestamp=datetime.now().isoformat(),
@@ -157,7 +164,9 @@ async def analyze(request: AnalyzeRequest):
     if not ENABLE_ANALYSIS:
         raise HTTPException(status_code=404, detail="Analysis endpoint disabled")
 
+    qid = _qid()
     llm, _, _ = _services()
+    logger.info(f"[{qid}] analyze: query={request.user_query!r} rows={request.row_count}")
     table_md = _rows_to_markdown(request.columns, request.rows)
     prompt = (
         f"User question: {request.user_query}\n"
@@ -167,6 +176,7 @@ async def analyze(request: AnalyzeRequest):
     )
 
     _, tool_args = llm.generate_with_tools(prompt, [_ANALYZE_TOOL])
+    logger.info(f"[{qid}] analyze ok: chart_type={tool_args.get('chart_type')!r}")
 
     return AnalyzeResponse(
         summary=tool_args["summary"],

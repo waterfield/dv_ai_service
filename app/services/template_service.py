@@ -26,9 +26,11 @@ class TemplateService:
         Returns: (sql_string, params_dict, template_key, reasoning_string, tool_name)
         Raises: ValueError if no template matches, InvalidParamsError if params are invalid.
         """
+        logger.info(f"Resolving: query={user_query!r}")
         tool_name, tool_args = self.llm.generate_with_tools(user_query, ALL_TOOLS, history=history)
 
         if tool_name == "unknown_query":
+            logger.warning(f"No template matched: query={user_query!r}")
             raise ValueError("Question not covered by any available template")
 
         resolver = None
@@ -54,7 +56,11 @@ class TemplateService:
                         param_errors.append(msg)
                 if template_errors:
                     raise ValueError(f"No template matched for {tool_name!r}: {'; '.join(template_errors)}")
+                logger.warning(f"Invalid params: tool={tool_name!r} template={template!r} errors={param_errors}")
                 raise InvalidParamsError(tool_name, template, param_errors)
-            return sql, params, tool_args.get("template", tool_name), reasoning, tool_name
+            template_key = tool_args.get("template", tool_name)
+            active_params = {k: v for k, v in params.items() if v is not None and k != "top_n"}
+            logger.info(f"Resolved: tool={tool_name!r} template={template_key!r} filters={active_params}")
+            return sql, params, template_key, reasoning, tool_name
 
         raise ValueError(f"Unknown tool returned by LLM: {tool_name!r}")
