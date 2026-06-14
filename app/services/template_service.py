@@ -4,6 +4,7 @@ from app.services.llm_service import LLMService
 from app.services.tools import ALL_TOOLS
 from app.services.tools.afe_financial import resolve_afe_financial
 from app.services.tools.afe_master import resolve_afe_master
+from app.services.unsupported_log import log_unsupported
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class TemplateService:
         tool_name, tool_args = self.llm.generate_with_tools(user_query, ALL_TOOLS, history=history)
 
         if tool_name == "unknown_query":
-            logger.warning(f"No template matched: query={user_query!r}")
+            log_unsupported("chat", user_query)
             raise ValueError("Question not covered by any available template")
 
         resolver = None

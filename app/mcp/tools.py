@@ -4,6 +4,7 @@ from pydantic import ValidationError
 
 from database import get_db
 from app.mcp import mcp, _executor
+from app.services.unsupported_log import log_unsupported
 from app.services.tools.afe_financial import (
     resolve_afe_financial,
     TEMPLATE_DESCRIPTIONS as FINANCIAL_DESCRIPTIONS,
@@ -220,8 +221,7 @@ def unknown_query(description: str) -> str:
     """
     description: plain English description of what the user asked for that couldn't be answered.
     """
-    import logging
-    logging.getLogger(__name__).warning(f"UNSUPPORTED_QUERY: {description}")
+    log_unsupported("mcp", description)
     return (
         f"No template available for: '{description}'. "
         "This request has been logged for review. "
