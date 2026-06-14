@@ -7,7 +7,7 @@ class AFEMasterRequest(BaseModel):
     AFE master data: attributes, listings, status, project, company, and timeline info.
 
     Use for ANY question about AFE properties, lists, details, timelines, approvals,
-    rejections, or metadata. Do NOT use for budget/actuals/spend — use afe_financial instead.
+    rejections, supplements, or metadata. Do NOT use for budget/actuals/spend — use afe_financial instead.
 
     Date range filters: approved_date_from/to (final_approval_date), completion_date_from/to
     (completion_date), closed_date_from/to (closed_date). All accept YYYY-MM-DD strings.
@@ -15,6 +15,9 @@ class AFEMasterRequest(BaseModel):
 
     division_order_number: user may say "DO number", "division order", "DO", or "division order number" —
     all map to this filter.
+
+    AFE supplements: amendments/revisions to an original AFE. supplement_number=0 is the original;
+    1, 2, 3... are sequentially numbered supplements stored in dim_afe_supplement.
 
     template guide:
       list_afes               -> list individual AFEs; use when user asks for AFEs under/in/belonging to a specific project, company, type, or status — filters by those values
@@ -27,6 +30,8 @@ class AFEMasterRequest(BaseModel):
       rejected_afes           -> rejected AFEs with rejection reasons
       upcoming_completions    -> open AFEs sorted by planned completion date (soonest first)
       recently_approved       -> recently final-approved AFEs
+      supplement_list         -> original AFE (supplement 0) + all numbered supplements; use when user asks about supplement history, amendments, or revisions for a specific AFE — filter by afe_number
+      supplement_count        -> AFEs ranked by number of supplements; use when user asks which AFEs have been supplemented/amended most
     """
 
     template: Literal[
@@ -40,6 +45,8 @@ class AFEMasterRequest(BaseModel):
         "rejected_afes",
         "upcoming_completions",
         "recently_approved",
+        "supplement_list",
+        "supplement_count",
     ]
 
     year:                 int | None = Field(None, ge=2000, le=2030, description="Filter by planned start year (exact)")
@@ -74,6 +81,8 @@ TEMPLATE_DESCRIPTIONS: dict[str, str] = {
     "rejected_afes":        "Rejected AFEs with rejection reasons",
     "upcoming_completions": "Open AFEs sorted by upcoming planned completion date",
     "recently_approved":    "Recently final-approved AFEs",
+    "supplement_list":      "Original AFE + all numbered supplements with status and budget",
+    "supplement_count":     "AFEs ranked by number of supplements (most amended first)",
 }
 
 AFE_MASTER_TEMPLATES: dict[str, str] = {
@@ -322,6 +331,61 @@ AFE_MASTER_TEMPLATES: dict[str, str] = {
           AND (:closed_date_to           IS NULL OR da.closed_date <= :closed_date_to)
           AND (:division_order_number    IS NULL OR da.division_order_number = :division_order_number)
         ORDER BY da.final_approval_date DESC
+    """,
+
+    "supplement_list": """
+        WITH afe_supplement_list AS (
+            SELECT  da.number              AS [AFE Number],
+                    da.name                AS [AFE Name],
+                    0                      AS [Supplement Number],
+                    da.status              AS [Status],
+                    da.planned_start_date  AS [Planned Start Date],
+                    da.budget_total        AS [Budget Total]
+            FROM    dim_afe da
+            WHERE   (:afe_number IS NULL OR da.number = :afe_number)
+
+            UNION ALL
+
+            SELECT  da.number              AS [AFE Number],
+                    da.name                AS [AFE Name],
+                    sup.number             AS [Supplement Number],
+                    sup.status             AS [Status],
+                    sup.planned_start_date AS [Planned Start Date],
+                    sup.budget_total       AS [Budget Total]
+            FROM    dim_afe_supplement sup
+            JOIN    dim_afe da ON sup.afe_id = da.id
+            WHERE   (:afe_number IS NULL OR da.number = :afe_number)
+        )
+        SELECT  TOP (:top_n)
+            [AFE Number],
+            [AFE Name],
+            [Supplement Number],
+            [Status],
+            [Planned Start Date],
+            [Budget Total]
+        FROM    afe_supplement_list
+        ORDER BY [AFE Number], [Supplement Number]
+    """,
+
+    "supplement_count": """
+        SELECT  TOP (:top_n)
+            da.number                   AS [AFE Number],
+            da.name                     AS [AFE Name],
+            da.status                   AS [Status],
+            da.afe_type_description     AS [Type],
+            da.company_name             AS [Company],
+            COUNT(sup.number)           AS [Supplement Count],
+            da.budget_total             AS [Original Budget Total]
+        FROM    dim_afe da
+        LEFT JOIN dim_afe_supplement sup ON sup.afe_id = da.id
+        WHERE   (:year                 IS NULL OR YEAR(da.planned_start_date) = :year)
+          AND   (:status               IS NULL OR da.status = :status)
+          AND   (:afe_type_description IS NULL OR da.afe_type_description = :afe_type_description)
+          AND   (:company_name         IS NULL OR da.company_name = :company_name)
+          AND   (:afe_number           IS NULL OR da.number = :afe_number)
+        GROUP BY da.number, da.name, da.status, da.afe_type_description, da.company_name, da.budget_total
+        HAVING  COUNT(sup.number) > 0
+        ORDER BY [Supplement Count] DESC
     """,
 }
 
