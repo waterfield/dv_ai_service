@@ -52,6 +52,8 @@ MasterTemplate = Literal[
     "rejected_afes",
     "upcoming_completions",
     "recently_approved",
+    "supplement_list",
+    "supplement_count",
 ]
 
 
@@ -85,7 +87,7 @@ def _run_query(sql: str, params: dict) -> str:
 )
 def query_afe_financial(
     template: FinancialTemplate,
-    afe_number: str | None = None,
+    afe_numbers: list[str] | None = None,
     year: int | None = None,
     status: str | None = None,
     afe_type_description: str | None = None,
@@ -93,7 +95,7 @@ def query_afe_financial(
 ) -> str:
     """
     template: one of the afe_financial template keys (call get_templates to see options).
-    afe_number: specific AFE identifier e.g. 'AFE-2025-001'.
+    afe_numbers: one or more AFE identifiers e.g. ['AFE-2025-001'] or ['AFE-2025-001', 'AFE-2025-002'].
     year: filter by budget/actuals year e.g. 2024.
     status: 'Open', 'Completed', or 'Rejected'.
     afe_type_description: AFE type e.g. 'Drill & Complete', 'Facility'.
@@ -101,7 +103,7 @@ def query_afe_financial(
     """
     tool_args = {
         "template": template,
-        "afe_number": afe_number,
+        "afe_numbers": afe_numbers,
         "year": year,
         "status": status,
         "afe_type_description": afe_type_description,
@@ -132,6 +134,13 @@ def query_afe_master(
     afe_type_description: str | None = None,
     afe_project_name: str | None = None,
     company_name: str | None = None,
+    division_order_number: str | None = None,
+    approved_date_from: str | None = None,
+    approved_date_to: str | None = None,
+    completion_date_from: str | None = None,
+    completion_date_to: str | None = None,
+    closed_date_from: str | None = None,
+    closed_date_to: str | None = None,
     top_n: int = 20,
 ) -> str:
     """
@@ -142,6 +151,13 @@ def query_afe_master(
     afe_type_description: AFE type e.g. 'Drill & Complete', 'Facility'.
     afe_project_name: exact project name e.g. '2023 - MIDSTREAM FACILITY AFEs'.
     company_name: filter by company name.
+    division_order_number: filter by division order number (also called DO number).
+    approved_date_from: final approval date range start YYYY-MM-DD.
+    approved_date_to: final approval date range end YYYY-MM-DD.
+    completion_date_from: completion date range start YYYY-MM-DD.
+    completion_date_to: completion date range end YYYY-MM-DD.
+    closed_date_from: closed date range start YYYY-MM-DD.
+    closed_date_to: closed date range end YYYY-MM-DD.
     top_n: max rows to return (1-100, default 20).
     """
     tool_args = {
@@ -152,6 +168,13 @@ def query_afe_master(
         "afe_type_description": afe_type_description,
         "afe_project_name": afe_project_name,
         "company_name": company_name,
+        "division_order_number": division_order_number,
+        "approved_date_from": approved_date_from,
+        "approved_date_to": approved_date_to,
+        "completion_date_from": completion_date_from,
+        "completion_date_to": completion_date_to,
+        "closed_date_from": closed_date_from,
+        "closed_date_to": closed_date_to,
         "top_n": top_n,
     }
     try:

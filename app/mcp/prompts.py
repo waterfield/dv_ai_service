@@ -13,7 +13,7 @@ def summarize_afe(afe_number: str) -> list[dict]:
         "You MUST follow these steps in order:\n"
         f'1. Call query_afe_master with afe_number="{afe_number}" to get '
         "attributes, status, project name, company, and timeline\n"
-        f'2. Call query_afe_financial with afe_number="{afe_number}" to get '
+        f'2. Call query_afe_financial with afe_numbers=["{afe_number}"] to get '
         "budget, actuals, commitments, and spend position\n"
         "3. Combine both results into a structured summary covering:\n"
         "   - AFE identity and status\n"

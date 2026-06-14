@@ -33,20 +33,27 @@ BOLD  = "\033[1m"
 
 FINANCIAL_PARAMS = {
     "year":                 None,
+    "month":                None,
     "status":               None,
     "afe_type_description": None,
-    "afe_number":           None,
     "top_n":                5,
 }
 
 MASTER_PARAMS = {
-    "year":                 None,
-    "status":               None,
-    "afe_type_description": None,
-    "afe_number":           None,
-    "afe_project_name":     None,
-    "company_name":         None,
-    "top_n":                5,
+    "year":                   None,
+    "approved_date_from":     None,
+    "approved_date_to":       None,
+    "completion_date_from":   None,
+    "completion_date_to":     None,
+    "closed_date_from":       None,
+    "closed_date_to":         None,
+    "status":                 None,
+    "afe_type_description":   None,
+    "afe_number":             None,
+    "afe_project_name":       None,
+    "company_name":           None,
+    "division_order_number":  None,
+    "top_n":                  5,
 }
 
 
@@ -89,12 +96,12 @@ def main() -> None:
     total_passed = total_failed = 0
 
     if filter_arg in ("all", "financial"):
-        p, f = run_suite("afe_financial  (17 templates)", AFE_FINANCIAL_TEMPLATES, FINANCIAL_PARAMS)
+        p, f = run_suite("afe_financial  (25 templates)", AFE_FINANCIAL_TEMPLATES, FINANCIAL_PARAMS)
         total_passed += p
         total_failed += f
 
     if filter_arg in ("all", "master"):
-        p, f = run_suite("afe_master     (10 templates)", AFE_MASTER_TEMPLATES, MASTER_PARAMS)
+        p, f = run_suite("afe_master     (12 templates)", AFE_MASTER_TEMPLATES, MASTER_PARAMS)
         total_passed += p
         total_failed += f
 
