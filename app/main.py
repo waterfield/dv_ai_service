@@ -76,7 +76,12 @@ class MCPAuthMiddleware:
     def __init__(self, asgi_app: ASGIApp) -> None:
         self.app = asgi_app
 
-    _PUBLIC_PATHS = {"/mcp/authorize", "/mcp/oauth/token"}
+    _PUBLIC_PATHS = {
+        "/mcp/authorize",
+        "/mcp/oauth/token",
+        "/mcp/.well-known/oauth-authorization-server",
+        "/.well-known/oauth-authorization-server",
+    }
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         path = scope.get("path", "")
