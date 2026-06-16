@@ -187,6 +187,7 @@ async def authorize_get(
 
 @router.post("/authorize", tags=["auth"])
 async def authorize_post(
+    request:               Request,
     client_id:             str  = Form(...),
     redirect_uri:          str  = Form(...),
     state:                 str  = Form(""),
@@ -208,7 +209,10 @@ async def authorize_post(
     }
     logger.info(f"OAuth code issued for client_id={client_id!r}")
 
-    params: dict = {"code": code}
+    # RFC 9207 — include issuer in the authorization response. Strict OAuth
+    # clients (Claude AI) reject a redirect lacking `iss` and abort before
+    # attempting the token exchange.
+    params: dict = {"code": code, "iss": _base_url(request)}
     if state:
         params["state"] = state
     return RedirectResponse(url=f"{redirect_uri}?{urlencode(params)}", status_code=302)
