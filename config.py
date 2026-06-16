@@ -9,6 +9,9 @@ DATABASE_USER = os.getenv("DATABASE_USER", "sa")
 DATABASE_PASSWORD = os.getenv("DATABASE_PASSWORD", "password")
 DATABASE_PORT = int(os.getenv("DATABASE_PORT", "1433"))
 DEBUG = os.getenv("DEBUG", "True").lower() == "true"
+# SQL echo is noisy (logs every full statement). Decoupled from DEBUG and off
+# by default — set SQL_ECHO=true only when debugging SQL.
+SQL_ECHO = os.getenv("SQL_ECHO", "False").lower() == "true"
 
 DATABASE_URL = (
     f"mssql+pyodbc://{DATABASE_USER}:{DATABASE_PASSWORD}@"

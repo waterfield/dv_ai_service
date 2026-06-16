@@ -6,7 +6,7 @@ from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool
 
-from config import DATABASE_URL, DEBUG, TABLE_KEY_FILTER, TABLE_WHITELIST, TABLE_EXCEPTION_LIST, DATABASE_SCHEMA
+from config import DATABASE_URL, SQL_ECHO, TABLE_KEY_FILTER, TABLE_WHITELIST, TABLE_EXCEPTION_LIST, DATABASE_SCHEMA
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ engine = create_engine(
     pool_size=5,
     max_overflow=10,
     pool_pre_ping=True,
-    echo=DEBUG,
+    echo=SQL_ECHO,
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

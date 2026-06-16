@@ -1,3 +1,4 @@
+import logging
 from contextlib import contextmanager
 from typing import Literal, Optional
 from pydantic import ValidationError
@@ -13,6 +14,13 @@ from app.services.tools.afe_master import (
     resolve_afe_master,
     TEMPLATE_DESCRIPTIONS as MASTER_DESCRIPTIONS,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _log_call(tool: str, template: str, args: dict) -> None:
+    filters = {k: v for k, v in args.items() if v is not None and k not in ("template", "top_n")}
+    logger.info(f"Resolved: tool={tool!r} template={template!r} filters={filters}")
 
 FinancialTemplate = Literal[
     "budget_by_cost_center",
@@ -115,6 +123,7 @@ def query_afe_financial(
     except ValidationError as e:
         msgs = [f"{err['loc'][0]}: {err['msg']}" for err in e.errors()]
         return f"Error — invalid parameters: {'; '.join(msgs)}"
+    _log_call("afe_financial", template, tool_args)
     return _run_query(sql, params)
 
 
@@ -183,6 +192,7 @@ def query_afe_master(
     except ValidationError as e:
         msgs = [f"{err['loc'][0]}: {err['msg']}" for err in e.errors()]
         return f"Error — invalid parameters: {'; '.join(msgs)}"
+    _log_call("afe_master", template, tool_args)
     return _run_query(sql, params)
 
 
