@@ -50,6 +50,7 @@ app.add_middleware(
 
 app.include_router(router, prefix="/api", tags=["api"])
 app.include_router(oauth_router, tags=["auth"])
+app.include_router(oauth_router, prefix="/mcp", tags=["auth"])
 
 
 def _validate_mcp_token(auth_header: str) -> bool:
@@ -75,8 +76,11 @@ class MCPAuthMiddleware:
     def __init__(self, asgi_app: ASGIApp) -> None:
         self.app = asgi_app
 
+    _PUBLIC_PATHS = {"/mcp/authorize", "/mcp/oauth/token"}
+
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] == "http" and scope.get("path", "").startswith("/mcp"):
+        path = scope.get("path", "")
+        if scope["type"] == "http" and path.startswith("/mcp") and path not in self._PUBLIC_PATHS:
             auth_required = bool(MCP_API_KEYS or MCP_OAUTH_CLIENTS)
             if auth_required:
                 headers = dict(scope.get("headers", []))
