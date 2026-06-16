@@ -19,7 +19,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-_mcp_http = mcp.http_app(path="/", transport="sse")
+_mcp_http = mcp.http_app(path="/", transport="http")
 
 
 @asynccontextmanager
