@@ -62,18 +62,66 @@ def _oauth_error(error: str, description: str, status: int = 400) -> JSONRespons
 #              /mcp/.well-known/oauth-authorization-server (via /mcp prefix mount)
 # ---------------------------------------------------------------------------
 
+def _base_url(request: Request) -> str:
+    """Public base URL, honoring X-Forwarded-Proto from nginx."""
+    proto = request.headers.get("x-forwarded-proto")
+    base = str(request.base_url).rstrip("/")
+    if proto:
+        # rewrite scheme to whatever nginx terminated (https)
+        rest = base.split("://", 1)[-1]
+        base = f"{proto}://{rest}"
+    return base
+
+
 @router.get("/.well-known/oauth-authorization-server", tags=["auth"])
 async def oauth_metadata(request: Request):
-    base = str(request.base_url).rstrip("/")
+    base = _base_url(request)
     return JSONResponse({
         "issuer":                                base,
         "authorization_endpoint":                f"{base}/mcp/authorize",
         "token_endpoint":                        f"{base}/mcp/oauth/token",
+        "registration_endpoint":                 f"{base}/mcp/register",
         "response_types_supported":              ["code"],
         "grant_types_supported":                 ["authorization_code", "client_credentials"],
         "code_challenge_methods_supported":      ["S256", "plain"],
-        "token_endpoint_auth_methods_supported": ["client_secret_post"],
+        "token_endpoint_auth_methods_supported": ["client_secret_post", "none"],
         "scopes_supported":                      ["read"],
+    })
+
+
+@router.get("/.well-known/oauth-protected-resource", tags=["auth"])
+async def protected_resource_metadata(request: Request):
+    """RFC 9728 — tells Claude which authorization server protects this MCP resource."""
+    base = _base_url(request)
+    return JSONResponse({
+        "resource":              f"{base}/mcp",
+        "authorization_servers": [base],
+        "scopes_supported":      ["read"],
+        "bearer_methods_supported": ["header"],
+    })
+
+
+# Dynamic Client Registration (RFC 7591) — Claude AI registers itself and gets
+# back the pre-configured client_id. Accepts any registration request.
+@router.post("/register", tags=["auth"])
+async def register_client(request: Request):
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    # Return the single configured client. If multiple, return the first.
+    client_id = next(iter(MCP_OAUTH_CLIENTS), "claude_ai")
+    client_secret = MCP_OAUTH_CLIENTS.get(client_id, "")
+    return JSONResponse(status_code=201, content={
+        "client_id":                  client_id,
+        "client_secret":              client_secret,
+        "client_id_issued_at":        0,
+        "client_secret_expires_at":   0,
+        "redirect_uris":              body.get("redirect_uris", []),
+        "grant_types":                ["authorization_code", "client_credentials"],
+        "response_types":             ["code"],
+        "token_endpoint_auth_method": "client_secret_post",
     })
 
 

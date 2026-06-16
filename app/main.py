@@ -79,8 +79,11 @@ class MCPAuthMiddleware:
     _PUBLIC_PATHS = {
         "/mcp/authorize",
         "/mcp/oauth/token",
+        "/mcp/register",
         "/mcp/.well-known/oauth-authorization-server",
+        "/mcp/.well-known/oauth-protected-resource",
         "/.well-known/oauth-authorization-server",
+        "/.well-known/oauth-protected-resource",
     }
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
@@ -91,9 +94,19 @@ class MCPAuthMiddleware:
                 headers = dict(scope.get("headers", []))
                 auth = headers.get(b"authorization", b"").decode()
                 if not _validate_mcp_token(auth):
+                    # RFC 9728 — point Claude at the protected-resource metadata so it
+                    # can discover the authorization server and start the OAuth flow.
+                    host = headers.get(b"host", b"").decode()
+                    proto = headers.get(b"x-forwarded-proto", b"https").decode()
+                    resource_meta = f"{proto}://{host}/.well-known/oauth-protected-resource"
                     response = JSONResponse(
                         status_code=401,
-                        content={"error": "Invalid or missing API key"},
+                        content={"error": "invalid_token", "error_description": "Authentication required"},
+                        headers={
+                            "WWW-Authenticate": (
+                                f'Bearer resource_metadata="{resource_meta}"'
+                            )
+                        },
                     )
                     await response(scope, receive, send)
                     return
